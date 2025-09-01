@@ -88,11 +88,11 @@ export class AuthService {
 
                 // Salvar token e dados do usuário
                 localStorage.setItem('token', loginData.token);
-                localStorage.setItem('user_data', JSON.stringify(!loginData));
+                localStorage.setItem('user_data', JSON.stringify(loginData.user));
 
-                this.currentUser = !loginData;
+                this.currentUser = loginData.user;
 
-                return { token: loginData.token, user: loginData };
+                return { token: loginData.token, user: loginData.user, roles: loginData.roles };
             } else {
                 throw new Error(response.message || 'Resposta inválida da API');
             }
