@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 
 // Configuração base da API
-const API_BASE_URL = 'https://krafasy-credit-api.mayacode.co/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL; // 'https://krafasy-credit-api.mayacode.co/api/v1';
 
 // Interface para resposta padrão da API
 export interface ApiResponse<T = any> {
