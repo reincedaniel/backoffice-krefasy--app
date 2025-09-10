@@ -210,6 +210,17 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         }
     };
 
+    const fetchLoanStatuses = async () => {
+        try {
+            const statuses = await loansService.getLoanStatuses();
+            console.log('Status recebidos no store:', statuses); // Para debug
+            return statuses || [];
+        } catch (error) {
+            console.error('Erro no store ao buscar status:', error);
+            throw error;
+        }
+    };
+
     // Ações das parcelas
     const fetchParcels = async (filters?: any) => {
         try {
@@ -403,6 +414,7 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         fetchLoanById,
         fetchLoanStats,
         approveLoan,
+        fetchLoanStatuses,
         fetchParcels,
         fetchParcelById,
         fetchParcelStats,
