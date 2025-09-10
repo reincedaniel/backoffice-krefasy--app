@@ -55,15 +55,27 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, layout: 'app' }
     },
     {
-        path: '/loans/pending',
-        name: 'krefasy-loans-pending',
-        component: () => import(/* webpackChunkName: "krefasy-loans-pending" */ '../views/loans/krefasy-loans-pending.vue'),
+        path: '/loans/add',
+        name: 'krefasy-loans-add',
+        component: () => import(/* webpackChunkName: "krefasy-loans-add" */ '../views/loans/krefasy-loans-add.vue'),
         meta: { requiresAuth: true, layout: 'app' }
     },
     {
-        path: '/loans/:id',
-        name: 'krefasy-loan-detail',
-        component: () => import(/* webpackChunkName: "krefasy-loan-detail" */ '../views/loans/krefasy-loan-detail.vue'),
+        path: '/loans/edit/:id',
+        name: 'krefasy-loans-edit',
+        component: () => import(/* webpackChunkName: "krefasy-loans-edit" */ '../views/loans/krefasy-loans-edit.vue'),
+        meta: { requiresAuth: true, layout: 'app' }
+    },
+    {
+        path: '/loans/view/:id',
+        name: 'krefasy-loans-view',
+        component: () => import(/* webpackChunkName: "krefasy-loans-view" */ '../views/loans/krefasy-loans-view.vue'),
+        meta: { requiresAuth: true, layout: 'app' }
+    },
+    {
+        path: '/loans/pending',
+        name: 'krefasy-loans-pending',
+        component: () => import(/* webpackChunkName: "krefasy-loans-pending" */ '../views/loans/krefasy-loans-pending.vue'),
         meta: { requiresAuth: true, layout: 'app' }
     },
     {

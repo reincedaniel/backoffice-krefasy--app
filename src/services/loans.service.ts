@@ -3,8 +3,8 @@ import apiService, { ApiResponse, PaginationParams, BaseFilters } from './api';
 // Interfaces para empréstimos
 export interface Loan {
     id: string;
-    clientId: string;
-    clientName: string;
+    customerEmail: string;
+    customerName: string;
     productType: 'PERSONAL' | 'BUSINESS' | 'MORTGAGE' | 'VEHICLE' | 'EDUCATION';
     amount: number;
     interestRate: number;
@@ -35,6 +35,7 @@ export interface LoanDocument {
 
 export interface LoanFilters extends BaseFilters {
     status?: string;
+    statusId?: string;
     productType?: string;
     riskLevel?: string;
     amountMin?: number;
@@ -92,11 +93,19 @@ export interface LoanStats {
 export class LoansService {
     // Listar empréstimos com paginação e filtros
     async getLoans(params: PaginationParams & LoanFilters): Promise<LoanListResponse> {
-        const response = await apiService.get<LoanListResponse>('/loans', params);
+        const response = await apiService.get<any>('/loans', params);
         if (!response.data) {
             throw new Error('Dados não encontrados');
         }
-        return response.data;
+
+        // Mapear a resposta da API para o formato esperado
+        return {
+            loans: response.data.data || [],
+            total: response.data.total || 0,
+            page: response.data.currentPage || 1,
+            limit: response.data.limit || 10,
+            totalPages: response.data.pages || 0
+        };
     }
 
     // Obter empréstimo por ID
@@ -270,6 +279,37 @@ export class LoansService {
             throw new Error('Documento não encontrado');
         }
         return response.data;
+    }
+
+    // Obter status dos empréstimos
+    async getLoanStatuses(): Promise<any[]> {
+        try {
+            const response = await apiService.get<any[]>('/loan-status');
+            console.log('Resposta da API loan-status:', response); // Para debug
+
+            // Se a resposta seguir o padrão ApiResponse
+            if (response && typeof response === 'object' && 'succeeded' in response) {
+                if (!response.succeeded || !response.data) {
+                    throw new Error('Status não encontrados');
+                }
+                return response.data;
+            }
+
+            // Se a resposta for diretamente o array (não seguindo o padrão ApiResponse)
+            if (Array.isArray(response)) {
+                return response;
+            }
+
+            // Se response.data é o array (caso alternativo)
+            if (response && typeof response === 'object' && 'data' in response && Array.isArray((response as any).data)) {
+                return (response as any).data;
+            }
+
+            throw new Error('Formato de resposta não reconhecido');
+        } catch (error: any) {
+            console.error('Erro detalhado ao buscar status:', error);
+            throw new Error(error.message || 'Erro ao buscar status dos empréstimos');
+        }
     }
 
     // Upload de documento para empréstimo
