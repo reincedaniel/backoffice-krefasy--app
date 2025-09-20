@@ -63,7 +63,7 @@
                             <div class="text-primary font-semibold">{{ data.value.loanNumber }}</div>
                         </template>
                         <template #requestedAmount="data">
-                            <div class="font-semibold">{{ data.value.requestedAmount }}</div>
+                            <div class="font-semibold">{{ formatCurrency(data.value.requestedAmount, data.value.currencySymbol, data.value.currencyCode) }}</div>
                         </template>
                         <template #loanStatusName="data">
                             <span class="badge" :class="getStatusBadgeClass(data.value.loanStatusName)">{{ data.value.loanStatusName }}</span>
@@ -104,10 +104,10 @@ const store = useKrefasyStore();
 
 const datatable: any = ref(null);
 const search = ref('');
-const items = ref([]);
+const items = ref<any[]>([]);
 const totalRows = ref(0);
 const loading = ref(false);
-const loanStatuses = ref([]);
+const loanStatuses = ref<any[]>([]);
 const selectedStatus = ref('');
 
 const cols = ref([
@@ -133,6 +133,27 @@ const getStatusBadgeClass = (status: string) => {
     }
 };
 
+const formatCurrency = (amount: number, currencySymbol?: string, currencyCode?: string) => {
+    if (!amount) {
+        return `${currencySymbol || 'AOA'} 0,00`;
+    }
+
+    // Se temos informações de moeda, usar elas
+    if (currencySymbol && currencyCode) {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: currencyCode,
+            currencyDisplay: 'symbol'
+        }).format(amount).replace(/^[^\d]*/, currencySymbol + ' ');
+    }
+
+    // Fallback para AOA
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'AOA'
+    }).format(amount);
+};
+
 const fetchLoans = async (filters: any = {}) => {
     try {
         loading.value = true;
@@ -151,6 +172,8 @@ const fetchLoans = async (filters: any = {}) => {
                 customerEmail: loan.customerEmail,
                 createdAt: loan.createdAt ? new Date(loan.createdAt).toLocaleDateString() : 'N/A',
                 requestedAmount: loan.requestedAmount,
+                currencySymbol: loan.currencySymbol,
+                currencyCode: loan.currencyCode,
                 loanStatusName: loan.loanStatusName,
                 actions: loan // Passando o objeto loan completo para ter acesso ao ID nas ações
             }));

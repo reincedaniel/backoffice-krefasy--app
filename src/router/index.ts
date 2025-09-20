@@ -69,7 +69,7 @@ const routes: RouteRecordRaw[] = [
     {
         path: '/loans/view/:id',
         name: 'krefasy-loans-view',
-        component: () => import(/* webpackChunkName: "krefasy-loans-view" */ '../views/loans/krefasy-loans-view.vue'),
+        component: () => import(/* webpackChunkName: "krefasy-loan-detail" */ '../views/loans/krefasy-loan-detail.vue'),
         meta: { requiresAuth: true, layout: 'app' }
     },
     {
