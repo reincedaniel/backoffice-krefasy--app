@@ -80,7 +80,7 @@ export class UserService {
         const response = await apiService.get<Blob>(`${this.basePath}/export`, filters, {
             responseType: 'blob'
         });
-        return response.data;
+        return response.data || new Blob();
     }
 }
 

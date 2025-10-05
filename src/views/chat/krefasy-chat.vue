@@ -159,7 +159,7 @@
                                                 :src="message.attachments?.[0]?.url"
                                                 :alt="message.attachments?.[0]?.name"
                                                 class="max-w-full h-auto rounded cursor-pointer"
-                                                @click="openImageModal(message.attachments?.[0]?.url)"
+                                                @click="openImageModal(message.attachments?.[0]?.url || '')"
                                             />
                                         </div>
                                         <p v-if="message.content" class="text-sm">{{ message.content }}</p>
@@ -173,7 +173,7 @@
                                             </svg>
                                             <div class="flex-1">
                                                 <p class="text-sm font-medium">{{ message.attachments?.[0]?.name }}</p>
-                                                <p class="text-xs opacity-75">{{ formatFileSize(message.attachments?.[0]?.size) }}</p>
+                                                <p class="text-xs opacity-75">{{ formatFileSize(message.attachments?.[0]?.size || 0) }}</p>
                                             </div>
                                             <a
                                                 :href="message.attachments?.[0]?.url"

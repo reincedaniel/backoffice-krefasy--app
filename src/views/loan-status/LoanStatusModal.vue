@@ -132,7 +132,7 @@ watch(() => props.loanStatus, (newLoanStatus) => {
     if (newLoanStatus && props.isEdit) {
         form.value = {
             name: newLoanStatus.name,
-            description: newLoanStatus.description
+            description: newLoanStatus.description || ''
         };
     } else {
         resetForm();

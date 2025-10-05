@@ -10,9 +10,9 @@ const normalizeApiResponse = <T>(response: any): ApiResponse<T> => {
     // Se a resposta é um array ou objeto direto, envolve em ApiResponse
     return {
         succeeded: true,
-        message: null,
-        description: null,
-        errors: null,
+        message: undefined,
+        description: undefined,
+        errors: undefined,
         data: response
     };
 };
@@ -21,7 +21,7 @@ const normalizeApiResponse = <T>(response: any): ApiResponse<T> => {
 export interface LoanStatus {
     id: string;
     name: string;
-    description: string;
+    description: string | null;
     isActive: boolean;
     createdAt: string;
     updatedAt: string | null;
@@ -30,7 +30,7 @@ export interface LoanStatus {
 // Interface para criar/atualizar status de empréstimo
 export interface LoanStatusCreateUpdate {
     name: string;
-    description: string;
+    description: string | null;
 }
 
 export class LoanStatusService {

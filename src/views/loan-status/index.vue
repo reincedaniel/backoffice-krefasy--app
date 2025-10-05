@@ -138,7 +138,7 @@ const filteredLoanStatuses = computed(() => {
         const query = searchQuery.value.toLowerCase();
         filtered = filtered.filter(status =>
             status.name.toLowerCase().includes(query) ||
-            status.description.toLowerCase().includes(query)
+            (status.description && status.description.toLowerCase().includes(query))
         );
     }
 

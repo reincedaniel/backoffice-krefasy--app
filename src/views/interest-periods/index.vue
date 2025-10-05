@@ -178,7 +178,7 @@ const loadInterestPeriods = async () => {
     loading.value = true;
     try {
         const response = await interestPeriodService.getInterestPeriods();
-        if (response.succeeded) {
+        if (response.succeeded && response.data) {
             interestPeriods.value = response.data;
         } else {
             Swal.fire('Erro', 'Erro ao carregar períodos de juros', 'error');
