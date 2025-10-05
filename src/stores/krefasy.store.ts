@@ -48,7 +48,7 @@ export const useKrefasyStore = defineStore('krefasy', () => {
     const currentMessages = ref<Message[]>([]);
     const unreadCount = ref(0);
 
-    // Estado das notificações
+    // Estado das notificações -
     const notifications = ref<any[]>([]);
     const notificationsCount = ref(0);
 
@@ -64,7 +64,7 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         overdueParcels: 0
     });
 
-    // Getters computados
+    // Getters computados -
     const hasRole = computed(() => (role: string) => currentUser.value?.roles.includes(role) || false);
     const hasPermission = computed(() => (permission: string) => currentUser.value?.permissions.includes(permission) || false);
     const isAdmin = computed(() => hasRole.value('Admin'));
