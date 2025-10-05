@@ -23,17 +23,17 @@
 import { ref, onMounted } from 'vue';
 import { useMeta } from '@/composables/use-meta';
 import { useRoute } from 'vue-router';
-import axios from '@/plugins/axios';
+import { apiService } from '@/services/api';
 
 const route = useRoute();
 const loanId = route.params.id;
-const loan = ref(null);
+const loan = ref<any>(null);
 
 const fetchLoanDetails = async () => {
     try {
-        const response = await axios.get(`/loans/${loanId}`);
-        if (response.data.succeeded) {
-            loan.value = response.data.data;
+        const response = await apiService.get(`/loans/${loanId}`);
+        if (response.succeeded) {
+            loan.value = response.data;
         }
     } catch (error) {
         console.error('Erro ao buscar detalhes do empréstimo:', error);
