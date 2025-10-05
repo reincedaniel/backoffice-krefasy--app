@@ -36,6 +36,27 @@ const routes: RouteRecordRaw[] = [
         component: () => import(/* webpackChunkName: "krefasy-dashboard" */ '../views/dashboard/krefasy-dashboard.vue'),
         meta: { requiresAuth: true, layout: 'app' }
     },
+    // Clientes (nova API)
+    {
+        path: '/customers',
+        name: 'customers',
+        component: () => import(/* webpackChunkName: "customers" */ '../views/customers/index.vue'),
+        meta: { requiresAuth: true, layout: 'app' }
+    },
+    {
+        path: '/customers/:id',
+        name: 'customer-detail',
+        component: () => import(/* webpackChunkName: "customer-detail" */ '../views/customers/detail.vue'),
+        meta: { requiresAuth: true, layout: 'app' }
+    },
+    // Users (gestão de utilizadores)
+    {
+        path: '/users',
+        name: 'users',
+        component: () => import(/* webpackChunkName: "users" */ '../views/users/index.vue'),
+        meta: { requiresAuth: true, layout: 'app' }
+    },
+    // Clients (legacy - manter por compatibilidade)
     {
         path: '/clients',
         name: 'krefasy-clients',
@@ -112,6 +133,61 @@ const routes: RouteRecordRaw[] = [
         path: '/settings',
         name: 'krefasy-settings',
         component: () => import(/* webpackChunkName: "krefasy-settings" */ '../views/settings/krefasy-settings.vue'),
+        meta: { requiresAuth: true, layout: 'app' }
+    },
+    {
+        path: '/currencies',
+        name: 'currencies',
+        component: () => import(/* webpackChunkName: "currencies" */ '../views/currencies/index.vue'),
+        meta: { requiresAuth: true, layout: 'app' }
+    },
+        {
+            path: '/currencies/:id',
+            name: 'currency-detail',
+            component: () => import(/* webpackChunkName: "currency-detail" */ '../views/currencies/detail.vue'),
+            meta: { requiresAuth: true, layout: 'app' }
+        },
+        // Configurações de Empréstimos
+        {
+            path: '/interest-periods',
+            name: 'interest-periods',
+            component: () => import(/* webpackChunkName: "interest-periods" */ '../views/interest-periods/index.vue'),
+            meta: { requiresAuth: true, layout: 'app' }
+        },
+        {
+            path: '/loan-status',
+            name: 'loan-status',
+            component: () => import(/* webpackChunkName: "loan-status" */ '../views/loan-status/index.vue'),
+            meta: { requiresAuth: true, layout: 'app' }
+        },
+        {
+            path: '/countries',
+            name: 'countries',
+            component: () => import(/* webpackChunkName: "countries" */ '../views/countries/index.vue'),
+            meta: { requiresAuth: true, layout: 'app' }
+        },
+        {
+            path: '/loan-interest-rates',
+            name: 'loan-interest-rates',
+            component: () => import(/* webpackChunkName: "loan-interest-rates" */ '../views/loan-interest-rates/index.vue'),
+            meta: { requiresAuth: true, layout: 'app' }
+        },
+        {
+            path: '/loan-installment-options',
+            name: 'loan-installment-options',
+            component: () => import(/* webpackChunkName: "loan-installment-options" */ '../views/loan-installment-options/index.vue'),
+            meta: { requiresAuth: true, layout: 'app' }
+        },
+    {
+        path: '/loan-products',
+        name: 'loan-products',
+        component: () => import(/* webpackChunkName: "loan-products" */ '../views/loan-products/index.vue'),
+        meta: { requiresAuth: true, layout: 'app' }
+    },
+    {
+        path: '/loan-products/:id',
+        name: 'loan-product-detail',
+        component: () => import(/* webpackChunkName: "loan-product-detail" */ '../views/loan-products/detail.vue'),
         meta: { requiresAuth: true, layout: 'app' }
     },
 

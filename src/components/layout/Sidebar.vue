@@ -74,13 +74,14 @@
                                     </router-link>
                                 </li>
                                 <li class="nav-item">
-                                    <router-link to="/clients" class="group" @click="toggleMobileMenu">
+                                    <router-link to="/customers" class="group" @click="toggleMobileMenu">
                                         <div class="flex items-center">
                                             <icon-users class="group-hover:!text-primary shrink-0" />
                                             <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Clientes</span>
                                         </div>
                                     </router-link>
                                 </li>
+
                                 <li class="nav-item">
                                     <router-link to="/loans" class="group" @click="toggleMobileMenu">
                                         <div class="flex items-center">
@@ -89,35 +90,89 @@
                                         </div>
                                     </router-link>
                                 </li>
-                                <li class="nav-item">
+                                <!-- <li class="nav-item">
                                     <router-link to="/loans/pending" class="group" @click="toggleMobileMenu">
                                         <div class="flex items-center">
                                             <icon-clock class="group-hover:!text-primary shrink-0" />
                                             <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Empréstimos Pendentes</span>
                                         </div>
                                     </router-link>
-                                </li>
-                                <li class="nav-item">
+                                </li> -->
+                                <!-- <li class="nav-item">
                                     <router-link to="/parcels" class="group" @click="toggleMobileMenu">
                                         <div class="flex items-center">
                                             <icon-calendar class="group-hover:!text-primary shrink-0" />
                                             <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Parcelas</span>
                                         </div>
                                     </router-link>
-                                </li>
-                                <li class="nav-item">
+                                </li> -->
+                                <!-- <li class="nav-item">
                                     <router-link to="/parcels/overdue" class="group" @click="toggleMobileMenu">
                                         <div class="flex items-center">
-                                            <icon-info-triangle class="group-hover:!text-primary shrink-0" />
+                                            <icon-calendar class="group-hover:!text-primary shrink-0" />
                                             <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Parcelas Vencidas</span>
                                         </div>
                                     </router-link>
-                                </li>
+                                </li> -->
                                 <li class="nav-item">
                                     <router-link to="/chat" class="group" @click="toggleMobileMenu">
                                         <div class="flex items-center">
                                             <icon-menu-chat class="group-hover:!text-primary shrink-0" />
                                             <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Chat</span>
+                                        </div>
+                                    </router-link>
+                                </li>
+
+                                <!-- Produtos e Configurações -->
+                                <li class="nav-item">
+                                    <button type="button" class="nav-link group w-full" @click="activeDropdown === 'loan-config' ? (activeDropdown = null) : (activeDropdown = 'loan-config')">
+                                        <div class="flex items-center">
+                                            <icon-desktop class="group-hover:!text-primary shrink-0" />
+                                            <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Configurações</span>
+                                        </div>
+                                        <div class="nav-link-icon ltr:ml-auto rtl:mr-auto">
+                                            <icon-caret-down class="w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': activeDropdown === 'loan-config' }" />
+                                        </div>
+                                    </button>
+                                    <vue-collapsible :isOpen="activeDropdown === 'loan-config'">
+                                        <ul class="sub-menu text-gray-500">
+                                            <!-- Produtos -->
+                                            <li class="menu-title">Produtos</li>
+                                            <li>
+                                                <router-link to="/loan-products" @click="toggleMobileMenu">Produtos de Empréstimo</router-link>
+                                            </li>
+                                            <li>
+                                                <router-link to="/loan-installment-options" @click="toggleMobileMenu">Opções de Parcelamento</router-link>
+                                            </li>
+
+                                            <!-- Configurações Gerais -->
+                                            <li class="menu-title mt-4">Configurações Gerais</li>
+                                            <li>
+                                                <router-link to="/currencies" @click="toggleMobileMenu">Moedas</router-link>
+                                            </li>
+                                            <li>
+                                                <router-link to="/countries" @click="toggleMobileMenu">Países</router-link>
+                                            </li>
+                                            <li>
+                                                <router-link to="/interest-periods" @click="toggleMobileMenu">Períodos de Juros</router-link>
+                                            </li>
+                                            <li>
+                                                <router-link to="/loan-status" @click="toggleMobileMenu">Status de Empréstimos</router-link>
+                                            </li>
+
+                                            <!-- Funcionalidades Avançadas -->
+                                            <li class="menu-title mt-4">Avançado</li>
+                                            <li>
+                                                <router-link to="/loan-interest-rates" @click="toggleMobileMenu">Taxas de Juros</router-link>
+                                            </li>
+                                        </ul>
+                                    </vue-collapsible>
+                                </li>
+                                <li class="nav-item">
+                                    <router-link to="/users" class="group" @click="toggleMobileMenu">
+                                        <div class="flex items-center">
+                                            <icon-user class="group-hover:!text-primary shrink-0" />
+                                            <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Utilizadores</span>
                                         </div>
                                     </router-link>
                                 </li>
@@ -129,14 +184,14 @@
                                         </div>
                                     </router-link>
                                 </li>
-                                <li class="nav-item">
+                                <!-- <li class="nav-item">
                                     <router-link to="/settings" class="group" @click="toggleMobileMenu">
                                         <div class="flex items-center">
                                             <icon-settings class="group-hover:!text-primary shrink-0" />
-                                            <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Configurações</span>
+                                            <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Gestão</span>
                                         </div>
                                     </router-link>
-                                </li>
+                                </li> -->
                             </ul>
                         </li>
 
@@ -814,25 +869,35 @@
     import IconAlertTriangle from '@/components/icon/icon-info-triangle.vue';
     import IconBarChart from '@/components/icon/icon-bar-chart.vue';
     import IconSettings from '@/components/icon/icon-settings.vue';
+    import IconDesktop from '@/components/icon/icon-desktop.vue';
+    import IconUser from '@/components/icon/icon-users.vue';
+    import IconDollarSignCircle from '@/components/icon/icon-dollar-sign-circle.vue';
 
     const store = useAppStore();
     const activeDropdown: any = ref('');
     const subActive: any = ref('');
 
     onMounted(() => {
-        const selector = document.querySelector('.sidebar ul a[href="' + window.location.pathname + '"]');
-        if (selector) {
-            selector.classList.add('active');
-            const ul: any = selector.closest('ul.sub-menu');
-            if (ul) {
-                let ele: any = ul.closest('li.menu').querySelectorAll('.nav-link') || [];
-                if (ele.length) {
-                    ele = ele[0];
-                    setTimeout(() => {
-                        ele.click();
-                    });
+        try {
+            const selector = document.querySelector('.sidebar ul a[href="' + window.location.pathname + '"]');
+            if (selector) {
+                selector.classList.add('active');
+                const ul: any = selector.closest('ul.sub-menu');
+                if (ul) {
+                    const menuItem = ul.closest('li.menu');
+                    if (menuItem) {
+                        const elements: any = menuItem.querySelectorAll('.nav-link') || [];
+                        if (elements.length) {
+                            const firstElement = elements[0];
+                            setTimeout(() => {
+                                firstElement.click();
+                            });
+                        }
+                    }
                 }
             }
+        } catch (error) {
+            console.warn('Erro ao inicializar sidebar:', error);
         }
     });
 
@@ -841,4 +906,5 @@
             store.toggleSidebar();
         }
     };
+
 </script>

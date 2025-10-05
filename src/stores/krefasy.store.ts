@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { authService, UserData } from '@/services/auth.service';
-import { clientsService, Client, ClientListResponse } from '@/services/clients.service';
+import { customerService, Customer } from '@/services/customers.service';
 import { loansService, Loan, LoanListResponse, LoanStats } from '@/services/loans.service';
 import { parcelsService, Parcel, ParcelListResponse, ParcelStats } from '@/services/parcels.service';
 import { messagesService, Conversation, Message, ConversationListResponse } from '@/services/messages.service';
@@ -12,13 +12,13 @@ export const useKrefasyStore = defineStore('krefasy', () => {
     const isAuthenticated = ref(false);
     const authLoading = ref(false);
 
-    // Estado dos clientes
-    const clients = ref<Client[]>([]);
+    // Estado dos customers
+    const clients = ref<Customer[]>([]);
     const clientsLoading = ref(false);
     const clientsTotal = ref(0);
     const clientsPage = ref(1);
     const clientsLimit = ref(20);
-    const selectedClient = ref<Client | null>(null);
+    const selectedClient = ref<Customer | null>(null);
 
     // Estado dos empréstimos
     const loans = ref<Loan[]>([]);
@@ -100,19 +100,23 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         return false;
     };
 
-    // Ações dos clientes
+    // Ações dos customers
     const fetchClients = async (filters?: any) => {
         try {
             clientsLoading.value = true;
-            const params = {
-                page: clientsPage.value,
-                limit: clientsLimit.value,
-                ...filters
-            };
-            const response = await clientsService.getClients(params);
-            clients.value = response.clients;
-            clientsTotal.value = response.total;
-            return response;
+            const response = await customerService.getCustomers();
+            if (response.succeeded && response.data) {
+                clients.value = response.data;
+                clientsTotal.value = response.data.length;
+                return {
+                    clients: response.data,
+                    total: response.data.length,
+                    page: 1,
+                    limit: response.data.length,
+                    totalPages: 1
+                };
+            }
+            throw new Error('Erro ao carregar customers');
         } catch (error) {
             throw error;
         } finally {
@@ -122,9 +126,12 @@ export const useKrefasyStore = defineStore('krefasy', () => {
 
     const fetchClientById = async (id: string) => {
         try {
-            const client = await clientsService.getClientById(id);
-            selectedClient.value = client;
-            return client;
+            const response = await customerService.getCustomerById(id);
+            if (response.succeeded && response.data) {
+                selectedClient.value = response.data;
+                return response.data;
+            }
+            throw new Error('Customer não encontrado');
         } catch (error) {
             throw error;
         }
@@ -132,10 +139,13 @@ export const useKrefasyStore = defineStore('krefasy', () => {
 
     const createClient = async (clientData: any) => {
         try {
-            const client = await clientsService.createClient(clientData);
-            clients.value.unshift(client);
-            clientsTotal.value++;
-            return client;
+            const response = await customerService.createCustomer(clientData);
+            if (response.succeeded && response.data) {
+                clients.value.unshift(response.data);
+                clientsTotal.value++;
+                return response.data;
+            }
+            throw new Error('Erro ao criar customer');
         } catch (error) {
             throw error;
         }
@@ -143,15 +153,18 @@ export const useKrefasyStore = defineStore('krefasy', () => {
 
     const updateClient = async (id: string, clientData: any) => {
         try {
-            const client = await clientsService.updateClient(id, clientData);
-            const index = clients.value.findIndex(c => c.id === id);
-            if (index !== -1) {
-                clients.value[index] = client;
+            const response = await customerService.updateCustomer(id, clientData);
+            if (response.succeeded && response.data) {
+                const index = clients.value.findIndex(c => c.id === id);
+                if (index !== -1) {
+                    clients.value[index] = response.data;
+                }
+                if (selectedClient.value?.id === id) {
+                    selectedClient.value = response.data;
+                }
+                return response.data;
             }
-            if (selectedClient.value?.id === id) {
-                selectedClient.value = client;
-            }
-            return client;
+            throw new Error('Erro ao atualizar customer');
         } catch (error) {
             throw error;
         }
