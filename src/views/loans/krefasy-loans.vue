@@ -11,7 +11,7 @@
         </ul>
 
         <!-- Header com Estatísticas -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mt-5">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-5">
             <div class="panel">
                 <div class="flex items-center justify-between">
                     <div>
@@ -48,7 +48,7 @@
                 </div>
             </div>
 
-            <div class="panel">
+            <!-- <div class="panel">
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Valor Total</p>
@@ -58,7 +58,7 @@
                         <icon-dollar-sign class="w-6 h-6 text-info" />
                     </div>
                 </div>
-            </div>
+            </div> -->
         </div>
 
         <!-- Filtros e Ações -->
