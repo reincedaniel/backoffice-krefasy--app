@@ -34,14 +34,34 @@
             <div v-else-if="loan">
                 <!-- Action Buttons -->
                 <div class="flex items-center lg:justify-end justify-center flex-wrap gap-4 mb-6">
-                    <button v-if="loan" type="button" class="btn btn-success gap-2" @click="approveLoan">
+                    <button
+                        v-if="loan && canApproveLoan"
+                        type="button"
+                        class="btn btn-success gap-2"
+                        @click="approveLoan"
+                    >
                         <icon-square-check />
                         Aprovar
                     </button>
 
-                    <button v-if="loan" type="button" class="btn btn-danger gap-2" @click="rejectLoan">
+                    <button
+                        v-if="loan && canRejectLoan"
+                        type="button"
+                        class="btn btn-danger gap-2"
+                        @click="rejectLoan"
+                    >
                         <icon-x-circle />
                         Rejeitar
+                    </button>
+
+                    <button
+                        v-if="loan && !canApproveLoan && !canRejectLoan"
+                        type="button"
+                        class="btn btn-info gap-2"
+                        disabled
+                    >
+                        <icon-square-check />
+                        {{ getActionButtonText() }}
                     </button>
 
                     <router-link :to="`/loans/edit/${loan.id}`" class="btn btn-warning gap-2">
@@ -498,6 +518,7 @@ import { useMeta } from '@/composables/use-meta';
 import { useKrefasyStore } from '@/stores/index';
 import { Loan } from '@/services/loans.service';
 import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/vue';
+import Swal from 'sweetalert2';
 import IconCircleCheck from '@/components/icon/icon-circle-check.vue';
 import IconPrinter from '@/components/icon/icon-printer.vue';
 import IconDownload from '@/components/icon/icon-download.vue';
@@ -599,11 +620,21 @@ const error = ref('');
 
 // Computed properties
 const canApproveLoan = computed(() => {
-    return !!loan.value;
+    if (!loan.value) return false;
+
+    const status = loan.value.loanStatusName || loan.value.status;
+
+    // Só pode aprovar se estiver pendente
+    return status === 'PENDING' || status === 'Pendente';
 });
 
 const canRejectLoan = computed(() => {
-    return !!loan.value;
+    if (!loan.value) return false;
+
+    const status = loan.value.loanStatusName || loan.value.status;
+
+    // Só pode rejeitar se estiver pendente
+    return status === 'PENDING' || status === 'Pendente';
 });
 
 const groupedDocuments = computed(() => {
@@ -748,18 +779,66 @@ const formatCurrency = (amount: number) => {
 const approveLoan = async () => {
     if (!loan.value) return;
 
-    if (confirm('Tem certeza que deseja aprovar este empréstimo?')) {
-        try {
-            loading.value = true;
-            await store.approveLoan(loan.value.id, {
-                approved: true,
-                modifiedAmount: loan.value.amount,
-            });
-            await loadLoanDetails(); // Recarregar dados atualizados
-        } catch (err: any) {
-            alert('Erro ao aprovar empréstimo: ' + (err.message || 'Erro desconhecido'));
-        } finally {
-            loading.value = false;
+    const { value: stripeAccountId } = await Swal.fire({
+        title: 'Aprovar Empréstimo com Stripe',
+        text: 'Por favor, informe o Stripe Account ID para prosseguir com a aprovação:',
+        input: 'text',
+        inputLabel: 'Stripe Account ID',
+        inputPlaceholder: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+        inputValue: '08de0395-27f3-40af-860d-b218143bf0e0',
+        inputValidator: (value) => {
+            if (!value) {
+                return 'Stripe Account ID é obrigatório!';
+            }
+            // Validação básica de UUID
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(value)) {
+                return 'Formato inválido. Use um UUID válido.';
+            }
+            return null;
+        },
+        showCancelButton: true,
+        confirmButtonText: 'Aprovar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#28a745',
+        cancelButtonColor: '#6c757d',
+        icon: 'question'
+    });
+
+    if (stripeAccountId) {
+        const result = await Swal.fire({
+            title: 'Confirmar Aprovação',
+            text: `Tem certeza que deseja aprovar este empréstimo de ${formatCurrency(loan.value.requestedAmount || loan.value.amount)} com Stripe?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sim, aprovar!',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                loading.value = true;
+                await store.approveWithStripe(loan.value.id, stripeAccountId);
+                await loadLoanDetails(); // Recarregar dados atualizados
+
+                await Swal.fire({
+                    title: 'Sucesso!',
+                    text: 'Empréstimo aprovado com sucesso!',
+                    icon: 'success',
+                    confirmButtonColor: '#28a745'
+                });
+            } catch (err: any) {
+                await Swal.fire({
+                    title: 'Erro!',
+                    text: 'Erro ao aprovar empréstimo: ' + (err.message || 'Erro desconhecido'),
+                    icon: 'error',
+                    confirmButtonColor: '#dc3545'
+                });
+            } finally {
+                loading.value = false;
+            }
         }
     }
 };
@@ -812,6 +891,35 @@ const previewDocument = (doc: Document) => {
         }
     } else {
         alert(`Preview do documento: ${doc.originalFileName} não disponível`);
+    }
+};
+
+const getActionButtonText = () => {
+    if (!loan.value) return 'N/A';
+
+    const status = loan.value.loanStatusName || loan.value.status;
+
+    switch (status) {
+        case 'APPROVED':
+        case 'Aprovado':
+            return 'Empréstimo Aprovado';
+        case 'REJECTED':
+        case 'Rejeitado':
+            return 'Empréstimo Rejeitado';
+        case 'ACTIVE':
+        case 'Ativo':
+            return 'Empréstimo Ativo';
+        case 'COMPLETED':
+        case 'Finalizado':
+            return 'Empréstimo Finalizado';
+        case 'DEFAULTED':
+        case 'Inadimplente':
+            return 'Empréstimo Inadimplente';
+        case 'RESTRUCTURED':
+        case 'Reestruturado':
+            return 'Empréstimo Reestruturado';
+        default:
+            return 'Status: ' + status;
     }
 };
 

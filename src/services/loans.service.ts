@@ -36,11 +36,15 @@ export interface LoanDocument {
 export interface LoanFilters extends BaseFilters {
     status?: string;
     statusId?: string;
+    loanProductId?: string;
     productType?: string;
     riskLevel?: string;
     amountMin?: number;
     amountMax?: number;
     clientId?: string;
+    customerId?: string;
+    sortBy?: string;
+    sortDesc?: boolean;
 }
 
 export interface CreateLoanRequest {
@@ -94,17 +98,20 @@ export class LoansService {
     // Listar empréstimos com paginação e filtros
     async getLoans(params: PaginationParams & LoanFilters): Promise<LoanListResponse> {
         const response = await apiService.get<any>('/loans', params);
-        if (!response.data) {
+
+        if (!response.data || !response.data.data) {
             throw new Error('Dados não encontrados');
         }
 
-        // Mapear a resposta da API para o formato esperado
+        // A API retorna { succeeded, message, description, errors, data: { total, currentPage, pages, limit, data } }
+        const apiData = response.data;
+
         return {
-            loans: response.data.data || [],
-            total: response.data.total || 0,
-            page: response.data.currentPage || 1,
-            limit: response.data.limit || 10,
-            totalPages: response.data.pages || 0
+            loans: apiData.data || [],
+            total: apiData.total || 0,
+            page: apiData.currentPage || 1,
+            limit: apiData.limit || 10,
+            totalPages: apiData.pages || 0
         };
     }
 
@@ -156,6 +163,17 @@ export class LoansService {
         const response = await apiService.post<Loan>(`/loans/${id}/approve`, approvalData);
         if (!response.data) {
             throw new Error('Erro ao aprovar empréstimo');
+        }
+        return response.data;
+    }
+
+    // Aprovar empréstimo com Stripe
+    async approveWithStripe(id: string, stripeAccountId: string): Promise<Loan> {
+        const response = await apiService.post<Loan>(`/loans/${id}/approve-with-stripe`, {
+            stripeAccountId
+        });
+        if (!response.data) {
+            throw new Error('Erro ao aprovar empréstimo com Stripe');
         }
         return response.data;
     }
