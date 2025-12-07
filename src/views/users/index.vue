@@ -6,7 +6,7 @@
                 <router-link to="/dashboard" class="text-primary hover:underline">Dashboard</router-link>
             </li>
             <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>Utilizadores</span>
+                <span>Utilizadores / Sócios</span>
             </li>
         </ul>
 
@@ -14,8 +14,8 @@
             <!-- Header da página -->
             <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
                 <div>
-                    <h4 class="text-2xl font-semibold dark:text-white-light">Gestão de Utilizadores</h4>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Gerencie todos os utilizadores e suas permissões</p>
+                    <h4 class="text-2xl font-semibold dark:text-white-light">Gestão de Utilizadores / Sócios</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Gerencie todos os utilizadores / sócios e suas permissões</p>
                 </div>
                 <div class="flex gap-4">
                     <button

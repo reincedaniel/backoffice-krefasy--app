@@ -65,7 +65,7 @@ export class AuthService {
     async login(credentials: LoginRequest): Promise<LoginResponse> {
         try {
             const response = await apiService.post<LoginResponse>('/auth/login', credentials);
-            debugger;
+
             if (response.succeeded && response.data) {
                 // response.data é do tipo LoginResponse (que tem token e user)
                 const loginData = response.data;

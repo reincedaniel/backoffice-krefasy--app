@@ -172,7 +172,7 @@
                                     <router-link to="/users" class="group" @click="toggleMobileMenu">
                                         <div class="flex items-center">
                                             <icon-user class="group-hover:!text-primary shrink-0" />
-                                            <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Utilizadores</span>
+                                            <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Utilizadores / Sócios</span>
                                         </div>
                                     </router-link>
                                 </li>
