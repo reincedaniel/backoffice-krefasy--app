@@ -745,8 +745,14 @@ router.beforeEach(async (to, from, next) => {
 
     // Proteção de rotas para Krefasy
     if (to.meta?.requiresAuth) {
-        const token = localStorage.getItem('token');
-        if (!token) {
+        try {
+            const raw = localStorage.getItem('USER_LOGIN');
+            const data = raw ? JSON.parse(raw) : null;
+            if (!data?.token) {
+                next('/auth/login');
+                return;
+            }
+        } catch {
             next('/auth/login');
             return;
         }

@@ -299,11 +299,9 @@
                                             </div>
                                             <div class="ltr:pl-4 rtl:pr-4 truncate">
                                                 <h4 class="text-base">
-                                                    John Doe<span class="text-xs bg-success-light rounded text-success px-1 ltr:ml-2 rtl:ml-2">Pro</span>
+                                                    {{ userLogin?.user?.name || 'Utilizador' }}<span class="text-xs bg-success-light rounded text-success px-1 ltr:ml-2 rtl:ml-2">Pro</span>
                                                 </h4>
-                                                <a class="text-black/60 hover:text-primary dark:text-dark-light/60 dark:hover:text-white" href="javascript:;"
-                                                    >johndoe@gmail.com</a
-                                                >
+                                                <span class="text-black/60 dark:text-dark-light/60 block truncate">{{ userLogin?.user?.email || '' }}</span>
                                             </div>
                                         </div>
                                     </li>
@@ -329,11 +327,11 @@
                                         </router-link>
                                     </li>
                                     <li class="border-t border-white-light dark:border-white-light/10">
-                                        <router-link to="/auth/login" class="text-danger !py-3" @click="close()">
-                                            <icon-logout class="w-4.5 h-4.5 ltr:mr-2 rtl:ml-2 rotate-90 shrink-0" />
+                                        <button type="button" class="text-danger !py-3 w-full text-left font-semibold dark:text-white-light/90" @click="handleLogout(close)">
+                                            <icon-logout class="w-4.5 h-4.5 ltr:mr-2 rtl:ml-2 rotate-90 shrink-0 inline" />
 
                                             Sign Out
-                                        </router-link>
+                                        </button>
                                     </li>
                                 </ul>
                             </template>
@@ -868,6 +866,8 @@
 
     import { useRoute } from 'vue-router';
     import { useAppStore } from '@/stores/index';
+    import { useKrefasyStore } from '@/stores/index';
+    import { authService } from '@/services/auth.service';
 
     import IconMenu from '@/components/icon/icon-menu.vue';
     import IconCalendar from '@/components/icon/icon-calendar.vue';
@@ -897,8 +897,16 @@
     import IconMenuMore from '@/components/icon/menu/icon-menu-more.vue';
 
     const store = useAppStore();
+    const krefasyStore = useKrefasyStore();
     const route = useRoute();
     const search = ref(false);
+
+    const userLogin = computed(() => authService.getLoginData());
+
+    const handleLogout = (close: () => void) => {
+        close();
+        krefasyStore.logout();
+    };
 
     // multi language
     const i18n = reactive(useI18n());

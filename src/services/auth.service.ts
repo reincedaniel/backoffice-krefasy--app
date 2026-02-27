@@ -10,7 +10,11 @@ export interface LoginResponse {
     token: string;
     user: UserData;
     roles: string[];
+    userId?: string; // opcional, para compatibilidade com API
 }
+
+/** Chave do localStorage onde é guardada a sessão do user logado (response.data do login). */
+export const USER_LOGIN_KEY = 'USER_LOGIN';
 
 // Interface para resposta da API de login
 export interface ApiLoginResponse {
@@ -42,15 +46,20 @@ export class AuthService {
     private currentUser: UserData | null = null;
 
     private constructor() {
-        // Recuperar usuário do localStorage se existir
-        const userData = localStorage.getItem('user_data');
-        if (userData) {
-            try {
-                this.currentUser = JSON.parse(userData);
-            } catch (error) {
-                console.error('Erro ao parsear dados do usuário:', error);
-                localStorage.removeItem('user_data');
-            }
+        const data = this.getLoginData();
+        if (data?.user) {
+            this.currentUser = data.user;
+        }
+    }
+
+    /** Obtém a sessão do user logado (USER_LOGIN) do localStorage. */
+    getLoginData(): LoginResponse | null {
+        try {
+            const raw = localStorage.getItem(USER_LOGIN_KEY);
+            if (!raw) return null;
+            return JSON.parse(raw) as LoginResponse;
+        } catch {
+            return null;
         }
     }
 
@@ -86,10 +95,8 @@ export class AuthService {
 
 
 
-                // Salvar token e dados do usuário
-                localStorage.setItem('token', loginData.token);
-                localStorage.setItem('user_data', JSON.stringify(loginData.user));
-
+                // Guardar sessão do user logado em USER_LOGIN
+                localStorage.setItem(USER_LOGIN_KEY, JSON.stringify(loginData));
                 this.currentUser = loginData.user;
 
                 return { token: loginData.token, user: loginData.user, roles: loginData.roles };
@@ -111,8 +118,7 @@ export class AuthService {
 
     // Logout do usuário
     logout(): void {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user_data');
+        localStorage.removeItem(USER_LOGIN_KEY);
         this.currentUser = null;
 
         // Redirecionar para login
@@ -121,29 +127,39 @@ export class AuthService {
 
     // Verificar se o usuário está autenticado
     isAuthenticated(): boolean {
-        const token = localStorage.getItem('token');
-        return !!token && !!this.currentUser;
+        const data = this.getLoginData();
+        return !!(data?.token && data?.user);
     }
 
     // Verificar se o usuário tem role específico
     hasRole(role: string): boolean {
-        return this.currentUser?.roles.includes(role) || false;
+        return this.getCurrentUser()?.roles.includes(role) ?? false;
     }
 
     // Verificar se o usuário tem permissão específica
     hasPermission(permission: string): boolean {
-        return this.currentUser?.permissions.includes(permission) || false;
+        return this.getCurrentUser()?.permissions.includes(permission) ?? false;
     }
 
-    // Obter usuário atual
+    // Obter usuário atual (a partir de USER_LOGIN)
     getCurrentUser(): UserData | null {
-        return this.currentUser;
+        const data = this.getLoginData();
+        if (data?.user) {
+            this.currentUser = data.user;
+            return data.user;
+        }
+        this.currentUser = null;
+        return null;
     }
 
     // Atualizar dados do usuário
     updateUserData(userData: UserData): void {
         this.currentUser = userData;
-        localStorage.setItem('user_data', JSON.stringify(userData));
+        const data = this.getLoginData();
+        if (data) {
+            data.user = userData;
+            localStorage.setItem(USER_LOGIN_KEY, JSON.stringify(data));
+        }
     }
 
     // Alterar senha

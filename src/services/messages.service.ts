@@ -325,7 +325,9 @@ export class MessagesService {
     // Configurar notificações em tempo real
     async setupRealTimeNotifications(): Promise<WebSocket> {
         // Implementar WebSocket para notificações em tempo real
-        const token = localStorage.getItem('token');
+        const raw = localStorage.getItem('USER_LOGIN');
+        const data = raw ? JSON.parse(raw) : null;
+        const token = data?.token ?? '';
         const ws = new WebSocket(`wss://krafasy-credit-api.mayacode.co/ws?token=${token}`);
 
         ws.onopen = () => {

@@ -63,62 +63,97 @@
 
         <!-- Filtros e Ações -->
         <div class="panel mt-5">
-            <div class="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-                <!-- Filtros -->
-                <div class="flex flex-col sm:flex-row gap-4 flex-1">
-                    <div class="flex gap-2">
-                        <select v-model="filters.status" @change="applyFilters" class="form-select min-w-[150px]">
+            <div class="flex flex-col gap-4">
+                <!-- Row 1: Selects bem divididos e responsivos -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="form-label">Status</label>
+                        <select v-model="filters.status" @change="applyFilters" class="form-select w-full">
                             <option value="">Todos os Status</option>
                             <option v-for="status in loanStatuses" :key="status.id" :value="status.name">
                                 {{ status.name }}
                             </option>
                         </select>
-
-                        <select v-model="filters.product" @change="applyFilters" class="form-select min-w-[150px]">
+                    </div>
+                    <div>
+                        <label class="form-label">Produto</label>
+                        <select v-model="filters.product" @change="applyFilters" class="form-select w-full">
                             <option value="">Todos os Produtos</option>
                             <option v-for="product in loanProducts" :key="product.id" :value="product.name">
                                 {{ product.name }}
                             </option>
                         </select>
-
-                        <select v-model="filters.currency" @change="applyFilters" class="form-select min-w-[120px]">
+                    </div>
+                    <div>
+                        <label class="form-label">Moeda</label>
+                        <select v-model="filters.currency" @change="applyFilters" class="form-select w-full">
                             <option value="">Todas as Moedas</option>
                             <option v-for="currency in currencies" :key="currency.id" :value="currency.code">
                                 {{ currency.code }} - {{ currency.name }}
                             </option>
                         </select>
                     </div>
+                    <div>
+                        <label class="form-label">Gestores</label>
+                        <select v-model="filters.managerId" @change="applyFilters" class="form-select w-full" aria-label="Gestores">
+                            <option v-for="opt in managerOptions" :key="opt.value || 'all'" :value="opt.value">
+                                <strong v-if="opt.isBold">{{ opt.label }}</strong>
+                                <span v-else>{{ opt.label }}</span>
+                            </option>
+                        </select>
+                    </div>
+                </div>
 
+                <!-- Row 2: Campo de busca (col-12) -->
+                <div class="w-full">
+                    <label class="form-label">Buscar</label>
+                    <input
+                        v-model="searchQuery"
+                        @input="debounceSearch"
+                        type="text"
+                        class="form-input w-full"
+                        placeholder="Buscar por número, cliente..."
+                    />
+                </div>
+
+                <!-- Row 3: Meus Clientes à esquerda, restantes à direita -->
+                <div class="flex justify-between items-center gap-2">
+                    <button
+                        @click="filterMyClients"
+                        type="button"
+                        class="btn btn-info btn-sm gap-2"
+                    >
+                        <icon-star class="w-4 h-4" />
+                        Meus Emprestimos
+                    </button>
                     <div class="flex gap-2">
-                        <input
-                            v-model="searchQuery"
-                            @input="debounceSearch"
-                            type="text"
-                            class="form-input min-w-[200px]"
-                            placeholder="Buscar por número, cliente..."
-                        />
-
-                        <button @click="clearFilters" class="btn btn-outline-secondary gap-2">
-                            <icon-x />
-                            Limpar
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Ações -->
-                <div class="flex gap-2">
-                    <button @click="exportLoans" class="btn btn-outline-primary gap-2">
-                        <icon-download />
+                    <button
+                        @click="clearFilters"
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm gap-2"
+                    >
+                        <icon-x class="w-4 h-4" />
+                        Limpar
+                    </button>
+                    <button
+                        @click="exportLoans"
+                        type="button"
+                        class="btn btn-outline-primary btn-sm gap-2"
+                    >
+                        <icon-download class="w-4 h-4" />
                         Exportar
-                        </button>
-
-                        <router-link to="/loans/add" class="btn btn-primary gap-2">
-                            <icon-plus />
-                            Novo Empréstimo
-                        </router-link>
-                    </div>
+                    </button>
+                    <router-link
+                        to="/loans/add"
+                        class="btn btn-primary btn-sm gap-2"
+                    >
+                        <icon-plus class="w-4 h-4" />
+                        Novo Empréstimo
+                    </router-link>
                     </div>
                 </div>
+            </div>
+        </div>
 
         <!-- Lista de Empréstimos -->
         <div class="panel mt-5">
@@ -309,6 +344,9 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useMeta } from '@/composables/use-meta';
 import { useKrefasyStore } from '@/stores/index';
+import userService from '@/services/users.service';
+import loansService from '@/services/loans.service';
+import authService from '@/services/auth.service';
 import Swal from 'sweetalert2';
 
 // Icons
@@ -321,6 +359,7 @@ import IconDownload from '@/components/icon/icon-download.vue';
 import IconPlus from '@/components/icon/icon-plus.vue';
 import IconEye from '@/components/icon/icon-eye.vue';
 import IconEdit from '@/components/icon/icon-edit.vue';
+import IconStar from '@/components/icon/icon-star.vue';
 import IconXCircle from '@/components/icon/icon-x-circle.vue';
 import IconArrowLeft from '@/components/icon/icon-arrow-left.vue';
 import IconArrowForward from '@/components/icon/icon-arrow-forward.vue';
@@ -328,6 +367,12 @@ import IconArrowForward from '@/components/icon/icon-arrow-forward.vue';
 useMeta({ title: 'Gestão de Empréstimos' });
 
 const store = useKrefasyStore();
+
+/** userId do user logado (USER_LOGIN.userId ou USER_LOGIN.user.id) para usar em ManagerId. */
+const loggedUserId = computed(() => {
+    const data = authService.getLoginData();
+    return data?.userId ?? data?.user?.id ?? '';
+});
 
 // Estado reativo
 const loans = ref<any[]>([]);
@@ -341,17 +386,23 @@ const pendingLoans = ref(0);
 const approvedLoans = ref(0);
 const totalAmount = ref(0);
 
-// Filtros
+// Filtros (por padrão "Meus Empréstimos" = gestor = user logado)
+const getDefaultManagerId = () => {
+    const data = authService.getLoginData();
+    return data?.userId ?? data?.user?.id ?? '';
+};
 const filters = ref({
     status: '',
     product: '',
-    currency: ''
+    currency: '',
+    managerId: getDefaultManagerId()
 });
 
 // Dados para filtros
 const loanStatuses = ref<any[]>([]);
 const loanProducts = ref<any[]>([]);
 const currencies = ref<any[]>([]);
+const managers = ref<any[]>([]);
 
 // Debounce para busca
 let searchTimeout: ReturnType<typeof setTimeout>;
@@ -367,8 +418,26 @@ const approvedCount = computed(() => {
 
 // totalAmount é calculado dinamicamente no fetchLoans
 
+// Opções do select Gestores: Todos, MEUS EMPRÉSTIMOS (user logado), depois os restantes users
+const managerOptions = computed(() => {
+    const opts: { value: string; label: string, isBold?: boolean }[] = [
+        { value: '', label: 'Todos os Gestores', isBold: true }
+    ];
+    if (loggedUserId.value) {
+        opts.push({ isBold: true, value: loggedUserId.value, label: 'MEUS EMPRÉSTIMOS' });
+    }
+    const others = managers.value.filter((u: any) => u.id !== loggedUserId.value);
+    others.forEach((u: any) => opts.push({ value: u.id, label: u.name || u.email }));
+    return opts;
+});
+
 const hasActiveFilters = computed(() => {
-    return filters.value.status || filters.value.product || filters.value.currency;
+    return (
+        filters.value.status ||
+        filters.value.product ||
+        filters.value.currency ||
+        (filters.value.managerId && filters.value.managerId !== loggedUserId.value)
+    );
 });
 
 const visiblePages = computed(() => {
@@ -384,7 +453,7 @@ const visiblePages = computed(() => {
 });
 
 // Métodos
-const fetchLoans = async () => {
+const fetchLoans = async (overrideManagerId?: string) => {
     try {
         loading.value = true;
 
@@ -396,6 +465,9 @@ const fetchLoans = async () => {
         // Adicionar filtros usando os nomes corretos da API
         if (filters.value.status) params.StatusId = filters.value.status;
         if (filters.value.product) params.LoanProductId = filters.value.product;
+        // ManagerId: priorizar override explícito (ex: botão Meus Clientes), depois filtro
+        if (overrideManagerId) params.ManagerId = overrideManagerId;
+        else if (filters.value.managerId) params.ManagerId = filters.value.managerId;
         if (searchQuery.value) params.Search = searchQuery.value;
 
         const response = await store.fetchLoans(params);
@@ -436,6 +508,14 @@ const fetchFilterData = async () => {
         const statuses = await store.fetchLoanStatuses();
         loanStatuses.value = statuses || [];
 
+        // Buscar users para filtro Gestores (API /api/v1/users)
+        const usersRes = await userService.getUsers();
+        if (usersRes.succeeded && usersRes.data?.data) {
+            managers.value = usersRes.data.data;
+        } else {
+            managers.value = [];
+        }
+
         // TODO: Implementar busca de produtos e moedas
         // const products = await store.fetchLoanProducts();
         // loanProducts.value = products || [];
@@ -473,11 +553,68 @@ const applyFilters = () => {
     fetchLoans();
 };
 
+const filterMyClients = async () => {
+    const managerId = loggedUserId.value;
+    if (!managerId) {
+        await Swal.fire({
+            title: 'Aviso',
+            text: 'Sessão não encontrada. Faça login novamente.',
+            icon: 'warning',
+            confirmButtonColor: '#f59e0b'
+        });
+        return;
+    }
+    try {
+        loading.value = true;
+        filters.value = { ...filters.value, managerId };
+        currentPage.value = 1;
+
+        const params: any = {
+            Page: 1,
+            Limit: pageSize.value,
+            ManagerId: managerId,
+            managerId: managerId
+        };
+        if (filters.value.status) params.StatusId = filters.value.status;
+        if (filters.value.product) params.LoanProductId = filters.value.product;
+        if (searchQuery.value) params.Search = searchQuery.value;
+
+        const response = await loansService.getLoans(params);
+
+        if (response?.loans) {
+            loans.value = response.loans;
+            totalLoans.value = response.total;
+            totalPages.value = response.totalPages;
+            pendingLoans.value = loans.value.filter(loan => loan.loanStatusName === 'Pendente').length;
+            approvedLoans.value = loans.value.filter(loan => loan.loanStatusName === 'Aprovado').length;
+            totalAmount.value = loans.value.reduce((sum, loan) => sum + (loan.requestedAmount || 0), 0);
+        } else {
+            loans.value = [];
+            totalLoans.value = 0;
+            totalPages.value = 1;
+            pendingLoans.value = 0;
+            approvedLoans.value = 0;
+            totalAmount.value = 0;
+        }
+    } catch (error) {
+        console.error('Erro ao filtrar meus clientes:', error);
+        await Swal.fire({
+            title: 'Erro!',
+            text: 'Erro ao carregar empréstimos. Tente novamente.',
+            icon: 'error',
+            confirmButtonColor: '#dc3545'
+        });
+    } finally {
+        loading.value = false;
+    }
+};
+
 const clearFilters = () => {
     filters.value = {
         status: '',
         product: '',
-        currency: ''
+        currency: '',
+        managerId: getDefaultManagerId()
     };
     searchQuery.value = '';
     currentPage.value = 1;
@@ -725,10 +862,9 @@ const formatDate = (dateString: string) => {
 
 // Lifecycle
 onMounted(async () => {
-    await Promise.all([
-        fetchLoans(),
-        fetchFilterData()
-    ]);
+    // Por padrão "Meus Empréstimos" (gestor = user logado) - filtro já inicializado em filters
+    await fetchLoans();
+    await fetchFilterData();
 });
 
 // Watchers
@@ -736,3 +872,5 @@ watch(currentPage, () => {
     fetchLoans();
 });
 </script>
+
+

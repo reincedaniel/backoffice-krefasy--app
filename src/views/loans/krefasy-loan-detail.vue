@@ -446,45 +446,131 @@
                                 <div class="p-6">
                                     <!-- Cronograma de Parcelas -->
                                     <div v-if="loan.installments && loan.installments.length > 0">
-                                        <h4 class="font-medium text-gray-800 dark:text-gray-200 mb-4 flex items-center">
-                                            <icon-list-check class="w-5 h-5 mr-2" />
-                                            Cronograma de Parcelas
-                                        </h4>
+                                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                                            <h4 class="font-medium text-gray-800 dark:text-gray-200 flex items-center">
+                                                <icon-list-check class="w-5 h-5 mr-2" />
+                                                Cronograma de Parcelas
+                                            </h4>
+                                            <!-- Filtros -->
+                                            <div class="flex flex-wrap gap-2 items-center">
+                                                <span class="text-sm text-white-dark">Filtrar:</span>
+                                                <select
+                                                    v-model="installmentFilter"
+                                                    class="form-select form-select-sm w-auto min-w-[140px]"
+                                                >
+                                                    <option value="all">Todas</option>
+                                                    <option value="paid">Pagas</option>
+                                                    <option value="unpaid">Não pagas</option>
+                                                    <option value="overdue">Em atraso</option>
+                                                    <option value="pending">Pendentes (não atrasadas)</option>
+                                                </select>
+                                                <select
+                                                    v-model="installmentSortBy"
+                                                    class="form-select form-select-sm w-auto min-w-[130px]"
+                                                >
+                                                    <option value="number">Por número</option>
+                                                    <option value="dueDate">Por vencimento</option>
+                                                    <option value="amount">Por valor (maior)</option>
+                                                    <option value="amount-asc">Por valor (menor)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <!-- Resumo das parcelas -->
+                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                                            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <div class="text-xs text-white-dark">Total</div>
+                                                <div class="font-semibold">{{ loan.installments.length }} parcelas</div>
+                                            </div>
+                                            <div class="p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
+                                                <div class="text-xs text-white-dark">Pagas</div>
+                                                <div class="font-semibold text-green-700 dark:text-green-300">{{ paidInstallmentsCount }}</div>
+                                            </div>
+                                            <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+                                                <div class="text-xs text-white-dark">Pendentes</div>
+                                                <div class="font-semibold text-amber-700 dark:text-amber-300">{{ pendingInstallmentsCount }}</div>
+                                            </div>
+                                            <div class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20">
+                                                <div class="text-xs text-white-dark">Em atraso</div>
+                                                <div class="font-semibold text-red-700 dark:text-red-300">{{ overdueInstallmentsCount }}</div>
+                                            </div>
+                                        </div>
+
                                         <div class="overflow-x-auto">
-                                            <table class="table-striped w-full">
+                                            <table class="table w-full">
                                                 <thead>
                                                     <tr>
                                                         <th>Parcela</th>
+                                                        <th>Valor</th>
                                                         <th>Data Venc.</th>
-                                                        <th>Valor Principal</th>
-                                                        <th>Juros</th>
-                                                        <th>Total</th>
+                                                        <th>Data Pagamento</th>
+                                                        <th>Valor Pago</th>
                                                         <th>Status</th>
+                                                        <th>Método</th>
                                                         <th>Ações</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr v-for="installment in loan.installments" :key="installment.id">
-                                                        <td>{{ installment.installmentNumber }}/{{ loan.numberOfInstallments }}</td>
-                                                        <td>{{ formatDate(installment.dueDate) }}</td>
-                                                        <td>{{ formatCurrency(installment.principalAmount) }}</td>
-                                                        <td>{{ formatCurrency(installment.interestAmount) }}</td>
-                                                        <td>{{ formatCurrency(installment.totalAmount) }}</td>
+                                                    <tr
+                                                        v-for="installment in filteredInstallments"
+                                                        :key="installment.id"
+                                                        :class="getInstallmentRowClass(installment)"
+                                                    >
                                                         <td>
-                                                            <span class="badge" :class="getInstallmentStatusBadgeClass(installment.status)">
-                                                                {{ installment.status }}
+                                                            <span class="font-medium">
+                                                                {{ installment.installmentNumber }}/{{ loan.numberOfInstallments }}
+                                                            </span>
+                                                        </td>
+                                                        <td class="font-semibold">{{ formatCurrency(installment.amount) }}</td>
+                                                        <td>{{ formatDate(installment.dueDate) }}</td>
+                                                        <td>
+                                                            <span v-if="installment.paidDate">{{ formatDate(installment.paidDate) }}</span>
+                                                            <span v-else class="text-white-dark">—</span>
+                                                        </td>
+                                                        <td>
+                                                            <span v-if="installment.paidAmount">{{ formatCurrency(installment.paidAmount) }}</span>
+                                                            <span v-else class="text-white-dark">—</span>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge" :class="getInstallmentStatusBadgeClass(installment)">
+                                                                {{ getInstallmentStatusLabel(installment) }}
                                                             </span>
                                                         </td>
                                                         <td>
-                                                            <button v-if="installment.status !== 'Pago'"
-                                                                    class="text-primary hover:text-primary-dark"
-                                                                    title="Visualizar detalhes">
-                                                                <icon-eye class="w-4 h-4" />
-                                                            </button>
+                                                            <span v-if="installment.paymentMethod" class="text-sm">{{ installment.paymentMethod }}</span>
+                                                            <span v-else class="text-white-dark">—</span>
+                                                        </td>
+                                                        <td>
+                                                            <a
+                                                                v-if="!installment.isPaid && installment.url"
+                                                                :href="installment.url"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                class="btn btn-primary btn-sm"
+                                                                title="Pagar parcela"
+                                                            >
+                                                                Pagar
+                                                            </a>
+                                                            <a
+                                                                v-else-if="installment.isPaid && installment.url"
+                                                                :href="installment.url"
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                class="text-primary hover:underline text-sm"
+                                                                title="Ver comprovante"
+                                                            >
+                                                                <icon-eye class="w-4 h-4 inline" />
+                                                            </a>
+                                                            <span v-else class="text-white-dark">—</span>
                                                         </td>
                                                     </tr>
                                                 </tbody>
                                             </table>
+                                        </div>
+
+                                        <!-- Mensagem quando filtro não retorna resultados -->
+                                        <div v-if="filteredInstallments.length === 0" class="text-center py-8 text-white-dark">
+                                            Nenhuma parcela encontrada com os filtros selecionados.
                                         </div>
                                     </div>
 
@@ -583,6 +669,20 @@ interface Document {
     downloadUrl: string;
 }
 
+interface Installment {
+    id: string;
+    installmentNumber: number;
+    amount: number;
+    dueDate: string;
+    paidDate?: string | null;
+    paidAmount?: number | null;
+    isPaid: boolean;
+    isOverdue: boolean;
+    createdAt: string;
+    paymentMethod?: string | null;
+    url?: string | null;
+}
+
 interface ExtendedLoan extends Loan {
     loanNumber?: string;
     loanProductId?: string;
@@ -601,7 +701,7 @@ interface ExtendedLoan extends Loan {
     endDate?: string | null;
     rejectionReason?: string;
     notes?: string;
-    installments?: any[];
+    installments?: Installment[];
     customerDetails?: CustomerDetails;
     currencyId?: string;
     currencyName?: string;
@@ -617,6 +717,8 @@ const store = useKrefasyStore();
 const loan = ref<ExtendedLoan | null>(null);
 const loading = ref(false);
 const error = ref('');
+const installmentFilter = ref<'all' | 'paid' | 'unpaid' | 'overdue' | 'pending'>('all');
+const installmentSortBy = ref<'number' | 'dueDate' | 'amount' | 'amount-asc'>('number');
 
 // Computed properties
 const canApproveLoan = computed(() => {
@@ -657,6 +759,70 @@ const hasValidLocation = computed(() => {
            loan.value?.customerDetails?.realTimeLocationLongitude !== undefined &&
            !isNaN(loan.value?.customerDetails?.realTimeLocationLatitude) &&
            !isNaN(loan.value?.customerDetails?.realTimeLocationLongitude);
+});
+
+// Installments computed
+const paidInstallmentsCount = computed(() => {
+    const installments = loan.value?.installments as Installment[] | undefined;
+    if (!installments) return 0;
+    return installments.filter((i) => i.isPaid).length;
+});
+
+const pendingInstallmentsCount = computed(() => {
+    const installments = loan.value?.installments as Installment[] | undefined;
+    if (!installments) return 0;
+    return installments.filter((i) => !i.isPaid && !i.isOverdue).length;
+});
+
+const overdueInstallmentsCount = computed(() => {
+    const installments = loan.value?.installments as Installment[] | undefined;
+    if (!installments) return 0;
+    return installments.filter((i) => i.isOverdue).length;
+});
+
+const filteredInstallments = computed(() => {
+    const installments = loan.value?.installments as Installment[] | undefined;
+    if (!installments || installments.length === 0) return [];
+
+    let result = [...installments];
+
+    // Aplicar filtro
+    switch (installmentFilter.value) {
+        case 'paid':
+            result = result.filter((i) => i.isPaid);
+            break;
+        case 'unpaid':
+            result = result.filter((i) => !i.isPaid);
+            break;
+        case 'overdue':
+            result = result.filter((i) => i.isOverdue);
+            break;
+        case 'pending':
+            result = result.filter((i) => !i.isPaid && !i.isOverdue);
+            break;
+        default:
+            break;
+    }
+
+    // Aplicar ordenação
+    switch (installmentSortBy.value) {
+        case 'number':
+            result.sort((a, b) => a.installmentNumber - b.installmentNumber);
+            break;
+        case 'dueDate':
+            result.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+            break;
+        case 'amount':
+            result.sort((a, b) => b.amount - a.amount);
+            break;
+        case 'amount-asc':
+            result.sort((a, b) => a.amount - b.amount);
+            break;
+        default:
+            break;
+    }
+
+    return result;
 });
 
 // Methods
@@ -733,20 +899,27 @@ const getDocumentTypeLabel = (docType: string) => {
     }
 };
 
-const getInstallmentStatusBadgeClass = (status: string) => {
-    switch (status?.toLowerCase()) {
-        case 'pago':
-        case 'paid':
-            return 'badge-outline-success';
-        case 'pendente':
-        case 'pending':
-            return 'badge-outline-warning';
-        case 'atrasado':
-        case 'overdue':
-            return 'badge-outline-danger';
-        default:
-            return 'badge-outline-secondary';
+const getInstallmentStatusBadgeClass = (installment: Installment) => {
+    if (installment.isPaid) return 'badge-outline-success';
+    if (installment.isOverdue) return 'badge-outline-danger';
+    return 'badge-outline-warning';
+};
+
+const getInstallmentStatusLabel = (installment: Installment) => {
+    if (installment.isPaid) return 'Pago';
+    if (installment.isOverdue) return 'Atrasado';
+    return 'Pendente';
+};
+
+const getInstallmentRowClass = (installment: Installment) => {
+    const base = 'transition-colors';
+    if (installment.isPaid) {
+        return `${base} bg-green-50/50 dark:bg-green-900/10 border-l-4 border-l-green-500`;
     }
+    if (installment.isOverdue) {
+        return `${base} bg-red-50/50 dark:bg-red-900/10 border-l-4 border-l-red-500`;
+    }
+    return `${base} bg-amber-50/30 dark:bg-amber-900/5 border-l-4 border-l-amber-500`;
 };
 
 const formatDate = (dateString: string) => {

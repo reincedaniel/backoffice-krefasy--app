@@ -47,12 +47,18 @@ export class ApiService {
     }
 
     private setupInterceptors() {
-        // Request interceptor para adicionar token
+        // Request interceptor para adicionar token (de USER_LOGIN)
         this.api.interceptors.request.use(
             (config) => {
-                const token = localStorage.getItem('token');
-                if (token) {
-                    config.headers.Authorization = `Bearer ${token}`;
+                try {
+                    const raw = localStorage.getItem('USER_LOGIN');
+                    const data = raw ? JSON.parse(raw) : null;
+                    const token = data?.token;
+                    if (token) {
+                        config.headers.Authorization = `Bearer ${token}`;
+                    }
+                } catch {
+                    // ignore
                 }
                 return config;
             },
@@ -68,9 +74,7 @@ export class ApiService {
             },
             (error: AxiosError) => {
                 if (error.response?.status === 401) {
-                    // Token expirado ou inválido
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user_data');
+                    localStorage.removeItem('USER_LOGIN');
                     window.location.href = '/auth/login';
                 }
                 return Promise.reject(error);
