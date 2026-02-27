@@ -531,9 +531,24 @@
                                                             <span v-if="installment.paidAmount">{{ formatCurrency(installment.paidAmount) }}</span>
                                                             <span v-else class="text-white-dark">—</span>
                                                         </td>
-                                                        <td>
+                                                        <td style="gap: 10px; display: flex; align-items: center;">
                                                             <span class="badge" :class="getInstallmentStatusBadgeClass(installment)">
                                                                 {{ getInstallmentStatusLabel(installment) }}
+                                                            </span>
+                                                            <span
+                                                                v-if="hasComprovativo(installment)"
+                                                                class="ml- inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                                                                title="Tem comprovativo"
+                                                            >
+                                                                <icon-file class="w-3.5 h-3.5 mr-0.5" />
+                                                                Comprovativos
+                                                            </span>
+                                                            <span
+                                                                v-if="getProofAcceptanceState(installment)"
+                                                                class="ml-1 text-xs"
+                                                                :class="getProofAcceptanceState(installment)?.accepted ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+                                                            >
+                                                                ({{ getProofAcceptanceState(installment)?.accepted ? 'Aceite' : 'Não aceite' }})
                                                             </span>
                                                         </td>
                                                         <td>
@@ -541,27 +556,41 @@
                                                             <span v-else class="text-white-dark">—</span>
                                                         </td>
                                                         <td>
-                                                            <a
-                                                                v-if="!installment.isPaid && installment.url"
-                                                                :href="installment.url"
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                class="btn btn-primary btn-sm"
-                                                                title="Pagar parcela"
-                                                            >
-                                                                Pagar
-                                                            </a>
-                                                            <a
-                                                                v-else-if="installment.isPaid && installment.url"
-                                                                :href="installment.url"
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                class="text-primary hover:underline text-sm"
-                                                                title="Ver comprovante"
-                                                            >
-                                                                <icon-eye class="w-4 h-4 inline" />
-                                                            </a>
-                                                            <span v-else class="text-white-dark">—</span>
+                                                            <div class="flex flex-wrap items-center gap-1">
+                                                                <template v-if="hasComprovativo(installment)">
+                                                                    <button
+                                                                        type="button"
+                                                                        class="btn btn-outline-primary btn-sm gap-1"
+                                                                        title="Ver comprovativo"
+                                                                        @click="openProofModal(installment)"
+                                                                    >
+                                                                        <icon-eye class="w-4 h-4" />
+                                                                        Ver comprovativo
+                                                                    </button>
+                                                                </template>
+                                                                <template v-if="!installment.isPaid">
+                                                                    <a
+                                                                        v-if="installment.url"
+                                                                        :href="installment.url"
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        class="btn btn-primary btn-sm"
+                                                                        title="Pagar parcela"
+                                                                    >
+                                                                        Pagar
+                                                                    </a>
+                                                                    <button
+                                                                        type="button"
+                                                                        class="btn btn-outline-success btn-sm gap-1"
+                                                                        title="Marcar como paga (manual)"
+                                                                        @click="openMarkPaidModal(installment)"
+                                                                    >
+                                                                        <icon-square-check class="w-4 h-4" />
+                                                                        Marcar como paga
+                                                                    </button>
+                                                                </template>
+                                                                <span v-if="!hasComprovativo(installment) && installment.isPaid" class="text-white-dark">—</span>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 </tbody>
@@ -594,6 +623,196 @@
                 </div>
             </div>
         </div>
+
+        <!-- Modal Ver Comprovativo -->
+        <Teleport to="body">
+            <TransitionRoot appear :show="showProofModal" as="template">
+                <Dialog as="div" class="relative z-[99]" @close="closeProofModal">
+                <TransitionChild
+                    as="template"
+                    enter="duration-300 ease-out"
+                    enter-from="opacity-0"
+                    enter-to="opacity-100"
+                    leave="duration-200 ease-in"
+                    leave-from="opacity-100"
+                    leave-to="opacity-0"
+                >
+                    <DialogOverlay class="fixed inset-0 bg-black/60" />
+                </TransitionChild>
+                <div class="fixed inset-0 overflow-y-auto">
+                    <div class="flex min-h-full items-center justify-center px-4 py-6">
+                        <TransitionChild
+                            as="template"
+                            enter="duration-300 ease-out"
+                            enter-from="opacity-0 scale-95"
+                            enter-to="opacity-100 scale-100"
+                            leave="duration-200 ease-in"
+                            leave-from="opacity-100 scale-100"
+                            leave-to="opacity-0 scale-95"
+                        >
+                            <DialogPanel class="panel border-0 p-0 rounded-lg overflow-hidden w-full max-w-2xl text-black dark:text-white-dark">
+                                <div class="flex items-center justify-between bg-[#fbfbfb] dark:bg-[#121c2c] ltr:pl-5 rtl:pr-5 py-3 ltr:pr-12 rtl:pl-12">
+                                    <h3 class="text-lg font-bold">
+                                        Comprovativo — Parcela {{ selectedProofInstallment ? selectedProofInstallment.installmentNumber : '' }}/{{ loan?.numberOfInstallments }}
+                                    </h3>
+                                    <button type="button" class="absolute top-3 ltr:right-3 rtl:left-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" @click="closeProofModal">
+                                        <icon-x class="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <div class="p-5 space-y-4">
+                                    <div v-if="selectedProofInstallment?.url" class="rounded-lg border border-white-dark/20 overflow-hidden bg-gray-100 dark:bg-gray-800">
+                                        <div class="h-[320px] flex flex-col">
+                                            <iframe
+                                                :src="selectedProofInstallment?.url"
+                                                class="flex-1 w-full min-h-0"
+                                                title="Comprovativo de pagamento"
+                                            />
+                                            <a
+                                                :href="selectedProofInstallment?.url"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="inline-flex items-center gap-1 p-2 text-sm text-primary hover:underline"
+                                            >
+                                                <icon-link class="w-4 h-4" />
+                                                Abrir num separador
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div v-else class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-white-dark">
+                                        Sem URL de comprovativo disponível.
+                                    </div>
+                                    <div class="border-t border-white-dark/20 pt-4">
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Decisão do comprovativo</label>
+                                        <div class="flex gap-3 mb-3">
+                                            <button
+                                                type="button"
+                                                class="btn flex-1"
+                                                :class="proofForm.accepted === true ? 'btn-success' : 'btn-outline-success'"
+                                                @click="proofForm.accepted = true"
+                                            >
+                                                <icon-square-check class="w-4 h-4 inline mr-1" />
+                                                Aceite
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="btn flex-1"
+                                                :class="proofForm.accepted === false ? 'btn-danger' : 'btn-outline-danger'"
+                                                @click="proofForm.accepted = false"
+                                            >
+                                                <icon-x-circle class="w-4 h-4 inline mr-1" />
+                                                Não aceite
+                                            </button>
+                                        </div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrição (obrigatória para Não aceite)</label>
+                                        <textarea
+                                            v-model="proofForm.description"
+                                            class="form-textarea w-full min-h-[80px]"
+                                            placeholder="Ex.: Comprovativo ilegível; dados não conferem..."
+                                            rows="3"
+                                        />
+                                    </div>
+                                    <div class="flex justify-end gap-2 pt-2">
+                                        <button type="button" class="btn btn-outline-danger" @click="closeProofModal">Fechar</button>
+                                        <button
+                                            type="button"
+                                            class="btn btn-primary"
+                                            :disabled="proofForm.accepted === null || (proofForm.accepted === false && !proofForm.description.trim())"
+                                            @click="saveProofAcceptance"
+                                        >
+                                            Guardar
+                                        </button>
+                                    </div>
+                                </div>
+                            </DialogPanel>
+                        </TransitionChild>
+                    </div>
+                </div>
+            </Dialog>
+        </TransitionRoot>
+        </Teleport>
+
+        <!-- Modal Marcar como paga -->
+        <Teleport to="body">
+            <TransitionRoot appear :show="showMarkPaidModal" as="template">
+                <Dialog as="div" class="relative z-[99]" @close="closeMarkPaidModal">
+                <TransitionChild
+                    as="template"
+                    enter="duration-300 ease-out"
+                    enter-from="opacity-0"
+                    enter-to="opacity-100"
+                    leave="duration-200 ease-in"
+                    leave-from="opacity-100"
+                    leave-to="opacity-0"
+                >
+                    <DialogOverlay class="fixed inset-0 bg-black/60" />
+                </TransitionChild>
+                <div class="fixed inset-0 overflow-y-auto">
+                    <div class="flex min-h-full items-center justify-center px-4 py-6">
+                        <TransitionChild
+                            as="template"
+                            enter="duration-300 ease-out"
+                            enter-from="opacity-0 scale-95"
+                            enter-to="opacity-100 scale-100"
+                            leave="duration-200 ease-in"
+                            leave-from="opacity-100 scale-100"
+                            leave-to="opacity-0 scale-95"
+                        >
+                            <DialogPanel class="panel border-0 p-0 rounded-lg overflow-hidden w-full max-w-md text-black dark:text-white-dark">
+                                <div class="flex items-center justify-between bg-[#fbfbfb] dark:bg-[#121c2c] ltr:pl-5 rtl:pr-5 py-3 ltr:pr-12 rtl:pl-12">
+                                    <h3 class="text-lg font-bold">
+                                        Marcar como paga — Parcela {{ selectedMarkPaidInstallment ? selectedMarkPaidInstallment.installmentNumber : '' }}/{{ loan?.numberOfInstallments }}
+                                    </h3>
+                                    <button type="button" class="absolute top-3 ltr:right-3 rtl:left-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" @click="closeMarkPaidModal">
+                                        <icon-x class="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <div class="p-5 space-y-4">
+                                    <p class="text-sm text-white-dark">
+                                        Valor da parcela: <strong>{{ selectedMarkPaidInstallment ? formatCurrency(selectedMarkPaidInstallment.amount) : '' }}</strong>
+                                    </p>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data do pagamento *</label>
+                                        <input v-model="markPaidForm.paidDate" type="date" class="form-input w-full" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valor pago *</label>
+                                        <input v-model.number="markPaidForm.amount" type="number" step="0.01" min="0" class="form-input w-full" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Método de pagamento *</label>
+                                        <select v-model="markPaidForm.paymentMethod" class="form-select w-full">
+                                            <option value="">Selecione...</option>
+                                            <option value="BANK_TRANSFER">Transferência bancária</option>
+                                            <option value="CREDIT_CARD">Cartão de crédito</option>
+                                            <option value="DEBIT_CARD">Cartão de débito</option>
+                                            <option value="CASH">Dinheiro</option>
+                                            <option value="PIX">PIX</option>
+                                            <option value="OTHER">Outro</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Referência / Notas</label>
+                                        <input v-model="markPaidForm.reference" type="text" class="form-input w-full" placeholder="Opcional" />
+                                    </div>
+                                    <div class="flex justify-end gap-2 pt-2">
+                                        <button type="button" class="btn btn-outline-danger" @click="closeMarkPaidModal">Cancelar</button>
+                                        <button
+                                            type="button"
+                                            class="btn btn-primary"
+                                            :disabled="!markPaidForm.paidDate || !markPaidForm.amount || !markPaidForm.paymentMethod || markPaidSaving"
+                                            @click="submitMarkAsPaid"
+                                        >
+                                            {{ markPaidSaving ? 'A guardar...' : 'Marcar como paga' }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </DialogPanel>
+                        </TransitionChild>
+                    </div>
+                </div>
+            </Dialog>
+        </TransitionRoot>
+        </Teleport>
     </div>
 </template>
 
@@ -603,7 +822,7 @@ import { useRoute } from 'vue-router';
 import { useMeta } from '@/composables/use-meta';
 import { useKrefasyStore } from '@/stores/index';
 import { Loan } from '@/services/loans.service';
-import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/vue';
+import { TabGroup, TabList, Tab, TabPanels, TabPanel, Dialog, TransitionRoot, TransitionChild, DialogPanel, DialogOverlay } from '@headlessui/vue';
 import Swal from 'sweetalert2';
 import IconCircleCheck from '@/components/icon/icon-circle-check.vue';
 import IconPrinter from '@/components/icon/icon-printer.vue';
@@ -624,6 +843,8 @@ import IconChecks from '@/components/icon/icon-checks.vue';
 import IconFile from '@/components/icon/icon-file.vue';
 import IconMapPin from '@/components/icon/icon-map-pin.vue';
 import IconLink from '@/components/icon/icon-link.vue';
+import IconX from '@/components/icon/icon-x.vue';
+import { parcelsService } from '@/services/parcels.service';
 
 // Definir interfaces para a nova estrutura da API
 interface CustomerDetails {
@@ -681,6 +902,15 @@ interface Installment {
     createdAt: string;
     paymentMethod?: string | null;
     url?: string | null;
+    /** Quando a API enviar: estado do comprovativo (aceite/não aceite) */
+    proofAccepted?: boolean | null;
+    proofRejectedReason?: string | null;
+}
+
+/** Estado local do comprovativo (Aceite/Não aceite + descrição) por parcela */
+interface ProofAcceptanceState {
+    accepted: boolean;
+    description: string;
 }
 
 interface ExtendedLoan extends Loan {
@@ -719,6 +949,18 @@ const loading = ref(false);
 const error = ref('');
 const installmentFilter = ref<'all' | 'paid' | 'unpaid' | 'overdue' | 'pending'>('all');
 const installmentSortBy = ref<'number' | 'dueDate' | 'amount' | 'amount-asc'>('number');
+
+// Modal Comprovativo
+const showProofModal = ref(false);
+const selectedProofInstallment = ref<Installment | null>(null);
+const proofForm = ref<{ accepted: boolean | null; description: string }>({ accepted: null, description: '' });
+const proofAcceptanceMap = ref<Record<string, ProofAcceptanceState>>({});
+
+// Modal Marcar como paga
+const showMarkPaidModal = ref(false);
+const selectedMarkPaidInstallment = ref<Installment | null>(null);
+const markPaidForm = ref({ paidDate: '', amount: 0, paymentMethod: '', reference: '' });
+const markPaidSaving = ref(false);
 
 // Computed properties
 const canApproveLoan = computed(() => {
@@ -920,6 +1162,88 @@ const getInstallmentRowClass = (installment: Installment) => {
         return `${base} bg-red-50/50 dark:bg-red-900/10 border-l-4 border-l-red-500`;
     }
     return `${base} bg-amber-50/30 dark:bg-amber-900/5 border-l-4 border-l-amber-500`;
+};
+
+const hasComprovativo = (installment: Installment) => !!installment?.url;
+
+const getProofAcceptanceState = (installment: Installment): ProofAcceptanceState | null => {
+    const local = proofAcceptanceMap.value[installment.id];
+    if (local) return local;
+    if (installment.proofAccepted !== undefined && installment.proofAccepted !== null) {
+        return { accepted: installment.proofAccepted, description: installment.proofRejectedReason ?? '' };
+    }
+    return null;
+};
+
+const openProofModal = (installment: Installment) => {
+    selectedProofInstallment.value = installment;
+    const existing = proofAcceptanceMap.value[installment.id];
+    proofForm.value = {
+        accepted: existing ? existing.accepted : (installment.proofAccepted ?? null),
+        description: existing?.description ?? installment.proofRejectedReason ?? ''
+    };
+    showProofModal.value = true;
+};
+
+const closeProofModal = () => {
+    showProofModal.value = false;
+    selectedProofInstallment.value = null;
+    proofForm.value = { accepted: null, description: '' };
+};
+
+const saveProofAcceptance = () => {
+    if (!selectedProofInstallment.value) return;
+    if (proofForm.value.accepted === false && !proofForm.value.description.trim()) return;
+    proofAcceptanceMap.value[selectedProofInstallment.value.id] = {
+        accepted: proofForm.value.accepted === true,
+        description: proofForm.value.description.trim()
+    };
+    // TODO: chamar API quando existir endpoint (ex.: PATCH /loans/:id/installments/:installmentId/proof)
+    closeProofModal();
+    Swal.fire({ title: 'Guardado', text: 'Decisão do comprovativo guardada.', icon: 'success', timer: 2000, showConfirmButton: false });
+};
+
+const openMarkPaidModal = (installment: Installment) => {
+    selectedMarkPaidInstallment.value = installment;
+    const today = new Date().toISOString().slice(0, 10);
+    markPaidForm.value = {
+        paidDate: today,
+        amount: installment.amount,
+        paymentMethod: '',
+        reference: `Pagamento manual em ${today}`
+    };
+    showMarkPaidModal.value = true;
+};
+
+const closeMarkPaidModal = () => {
+    showMarkPaidModal.value = false;
+    selectedMarkPaidInstallment.value = null;
+    markPaidForm.value = { paidDate: '', amount: 0, paymentMethod: '', reference: '' };
+};
+
+const submitMarkAsPaid = async () => {
+    const inst = selectedMarkPaidInstallment.value;
+    if (!inst || !markPaidForm.value.paidDate || !markPaidForm.value.amount || !markPaidForm.value.paymentMethod) return;
+    markPaidSaving.value = true;
+    try {
+        await parcelsService.markAsPaid(inst.id, {
+            amount: markPaidForm.value.amount,
+            paymentMethod: markPaidForm.value.paymentMethod,
+            reference: markPaidForm.value.reference || `Pagamento manual em ${markPaidForm.value.paidDate}`
+        });
+        closeMarkPaidModal();
+        await loadLoanDetails();
+        await Swal.fire({ title: 'Sucesso', text: 'Parcela marcada como paga.', icon: 'success', confirmButtonColor: '#28a745' });
+    } catch (err: any) {
+        await Swal.fire({
+            title: 'Erro',
+            text: err.message || 'Não foi possível marcar a parcela como paga. Verifique se o ID da parcela corresponde à API de parcelas.',
+            icon: 'error',
+            confirmButtonColor: '#dc3545'
+        });
+    } finally {
+        markPaidSaving.value = false;
+    }
 };
 
 const formatDate = (dateString: string) => {
