@@ -141,9 +141,6 @@
                                             <li>
                                                 <router-link to="/loan-products" @click="toggleMobileMenu">Produtos de Empréstimo</router-link>
                                             </li>
-                                            <li>
-                                                <router-link to="/loan-installment-options" @click="toggleMobileMenu">Opções de Parcelamento</router-link>
-                                            </li>
 
                                             <!-- Configurações Gerais -->
                                             <li class="menu-title mt-4">Configurações Gerais</li>

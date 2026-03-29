@@ -203,11 +203,24 @@
 
                 <!-- Opções de Parcelamento -->
                 <div class="panel">
-                    <div class="flex items-center justify-between mb-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                             Opções de Parcelamento
                         </h3>
-                        <span class="badge badge-outline-info">{{ product.installmentOptions.length }} opções</span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                :disabled="loading"
+                                @click="openAddInstallmentOption"
+                            >
+                                <svg class="w-4 h-4 ltr:mr-1 rtl:ml-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Adicionar opção
+                            </button>
+                            <span class="badge badge-outline-info">{{ product.installmentOptions.length }} opções</span>
+                        </div>
                     </div>
                     <div v-if="product.installmentOptions.length === 0" class="text-center py-8 text-gray-500">
                         Nenhuma opção de parcelamento configurada
@@ -216,7 +229,7 @@
                         <div
                             v-for="option in product.installmentOptions"
                             :key="option.id"
-                            class="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+                            class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex flex-col"
                         >
                             <div class="flex items-center justify-between mb-2 gap-2">
                                 <h4 class="font-semibold text-gray-900 dark:text-white">{{ option.interestPeriod.displayName }}</h4>
@@ -230,7 +243,7 @@
                                     <span class="text-2xl font-bold text-success">{{ option.maxInstallments }}x</span>
                                 </div>
                             </div>
-                            <div class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                            <div class="space-y-1 text-sm text-gray-600 dark:text-gray-300 flex-1">
                                 <div>Período: {{ option.interestPeriod.daysInPeriod }} dias</div>
                                 <div
                                     v-if="installmentInterestRatePercentByOptionId[option.id] == null"
@@ -238,6 +251,24 @@
                                 >
                                     Sem taxa de juros para este período — configure na secção Taxas de Juros do produto.
                                 </div>
+                            </div>
+                            <div class="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary btn-sm"
+                                    :disabled="loading"
+                                    @click="editInstallmentOption(option)"
+                                >
+                                    Editar
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-danger btn-sm"
+                                    :disabled="loading"
+                                    @click="deleteInstallmentOption(option)"
+                                >
+                                    Excluir
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -284,6 +315,17 @@
                 @close="closeInterestRateModal"
                 @saved="handleInterestRateSaved"
             />
+
+            <InstallmentOptionModal
+                v-if="product"
+                :show="showInstallmentOptionModal"
+                :fixed-loan-product-id="product.id"
+                :loan-product-name="product.name"
+                :installment-option="selectedInstallmentOption"
+                :is-edit="isEditInstallmentOption"
+                @close="closeInstallmentOptionModal"
+                @save="handleInstallmentOptionSave"
+            />
         </div>
     </div>
 </template>
@@ -292,10 +334,20 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMeta } from '@/composables/use-meta';
-import { loanProductService, type LoanProduct, type InterestRate } from '@/services/loan-products.service';
+import {
+    loanProductService,
+    type LoanProduct,
+    type InterestRate,
+    type InstallmentOption
+} from '@/services/loan-products.service';
 import { loanInterestRateService } from '@/services/loan-interest-rates.service';
+import {
+    loanInstallmentOptionService,
+    type LoanInstallmentOptionCreateUpdate
+} from '@/services/loan-installment-options.service';
 import LoanProductModal from './LoanProductModal.vue';
 import LoanInterestRateModal from './LoanInterestRateModal.vue';
+import InstallmentOptionModal from '@/views/loan-installment-options/InstallmentOptionModal.vue';
 import Swal from 'sweetalert2';
 
 const route = useRoute();
@@ -309,6 +361,9 @@ const showEditModal = ref(false);
 const showInterestRateModal = ref(false);
 const selectedInterestRate = ref<InterestRate | null>(null);
 const isEditInterestRate = ref(false);
+const showInstallmentOptionModal = ref(false);
+const selectedInstallmentOption = ref<InstallmentOption | null>(null);
+const isEditInstallmentOption = ref(false);
 
 function resolveInterestRatePercentForPeriod(rates: InterestRate[], interestPeriodId: string): number | null {
     const matching = rates.filter((r) => r.interestPeriodId === interestPeriodId);
@@ -392,6 +447,102 @@ const handleInterestRateSaved = () => {
         icon: 'success'
     });
     loadProduct();
+};
+
+const openAddInstallmentOption = () => {
+    selectedInstallmentOption.value = null;
+    isEditInstallmentOption.value = false;
+    showInstallmentOptionModal.value = true;
+};
+
+const editInstallmentOption = (option: InstallmentOption) => {
+    selectedInstallmentOption.value = option;
+    isEditInstallmentOption.value = true;
+    showInstallmentOptionModal.value = true;
+};
+
+const closeInstallmentOptionModal = () => {
+    showInstallmentOptionModal.value = false;
+    selectedInstallmentOption.value = null;
+    isEditInstallmentOption.value = false;
+};
+
+const handleInstallmentOptionSave = async (data: LoanInstallmentOptionCreateUpdate) => {
+    try {
+        let response;
+        if (isEditInstallmentOption.value && selectedInstallmentOption.value) {
+            response = await loanInstallmentOptionService.updateLoanInstallmentOption(
+                selectedInstallmentOption.value.id,
+                data
+            );
+        } else {
+            response = await loanInstallmentOptionService.createLoanInstallmentOption(data);
+        }
+
+        if (response.succeeded) {
+            await Swal.fire({
+                title: 'Sucesso',
+                text: 'Opção de parcelamento guardada com sucesso.',
+                icon: 'success'
+            });
+            closeInstallmentOptionModal();
+            loadProduct();
+        } else {
+            const msg =
+                response.message ||
+                response.description ||
+                response.errors?.join(', ') ||
+                'Não foi possível guardar a opção.';
+            await Swal.fire({ title: 'Erro', text: msg, icon: 'error' });
+        }
+    } catch (err: any) {
+        console.error('Erro ao guardar opção de parcelamento:', err);
+        await Swal.fire({
+            title: 'Erro',
+            text: err?.message || 'Erro ao guardar opção de parcelamento.',
+            icon: 'error'
+        });
+    }
+};
+
+const deleteInstallmentOption = async (option: InstallmentOption) => {
+    const result = await Swal.fire({
+        title: 'Confirmar exclusão',
+        text: `Remover a opção "${option.interestPeriod.displayName}" (${option.maxInstallments} parcelas máx.)?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, excluir',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545'
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        const response = await loanInstallmentOptionService.deleteLoanInstallmentOption(option.id);
+        if (response.succeeded) {
+            await Swal.fire({
+                title: 'Sucesso',
+                text: 'Opção de parcelamento excluída.',
+                icon: 'success'
+            });
+            loadProduct();
+        } else {
+            const msg =
+                response.message ||
+                response.description ||
+                response.errors?.join(', ') ||
+                'Não foi possível excluir a opção.';
+            await Swal.fire({ title: 'Erro', text: msg, icon: 'error' });
+        }
+    } catch (err: any) {
+        console.error('Erro ao excluir opção de parcelamento:', err);
+        await Swal.fire({
+            title: 'Erro',
+            text: err?.message || 'Erro ao excluir opção de parcelamento.',
+            icon: 'error'
+        });
+    }
 };
 
 const deleteInterestRate = async (rate: InterestRate) => {

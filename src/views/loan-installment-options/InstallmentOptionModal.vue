@@ -12,11 +12,14 @@
                             <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
                                 {{ isEdit ? 'Editar Opção de Parcelamento' : 'Nova Opção de Parcelamento' }}
                             </h3>
+                            <p v-if="fixedLoanProductId && loanProductName" class="mt-1 text-sm text-gray-600">
+                                Produto: <span class="font-medium text-gray-900">{{ loanProductName }}</span>
+                            </p>
                             <div class="mt-4">
                                 <form @submit.prevent="save">
                                     <div class="space-y-4">
-                                        <!-- Produto de Empréstimo -->
-                                        <div>
+                                        <!-- Produto de Empréstimo (só na página global) -->
+                                        <div v-if="!fixedLoanProductId">
                                             <label class="block text-sm font-medium text-gray-700">Produto de Empréstimo *</label>
                                             <select
                                                 v-model="form.loanProductId"
@@ -101,6 +104,9 @@ const props = defineProps<{
     show: boolean;
     installmentOption?: LoanInstallmentOption | null;
     isEdit: boolean;
+    /** No detalhe do produto o ID já é conhecido — esconde o select de produto */
+    fixedLoanProductId?: string | null;
+    loanProductName?: string;
 }>();
 
 // Emits
@@ -122,9 +128,12 @@ const availableProducts = ref<Array<{id: string, name: string}>>([]);
 const availablePeriods = ref<Array<{id: string, displayName: string, daysInPeriod: number}>>([]);
 
 // Métodos
+const effectiveLoanProductId = () =>
+    (props.fixedLoanProductId || form.value.loanProductId || '').trim();
+
 const resetForm = () => {
     form.value = {
-        loanProductId: '',
+        loanProductId: props.fixedLoanProductId || '',
         interestPeriodId: '',
         maxInstallments: 1
     };
@@ -134,7 +143,7 @@ const resetForm = () => {
 const validateForm = () => {
     errors.value = {};
 
-    if (!form.value.loanProductId?.trim()) {
+    if (!effectiveLoanProductId()) {
         errors.value.loanProductId = 'Produto de empréstimo é obrigatório';
     }
 
@@ -155,7 +164,11 @@ const validateForm = () => {
 
 const save = () => {
     if (validateForm()) {
-        emit('save', { ...form.value });
+        emit('save', {
+            loanProductId: effectiveLoanProductId(),
+            interestPeriodId: form.value.interestPeriodId,
+            maxInstallments: form.value.maxInstallments
+        });
     }
 };
 
@@ -165,6 +178,18 @@ const close = () => {
 
 const loadAvailableData = async () => {
     try {
+        if (props.fixedLoanProductId) {
+            const periodsResponse = await interestPeriodService.getInterestPeriods();
+            if (periodsResponse.succeeded && periodsResponse.data) {
+                availablePeriods.value = periodsResponse.data.map((p) => ({
+                    id: p.id,
+                    displayName: p.displayName,
+                    daysInPeriod: p.daysInPeriod
+                }));
+            }
+            return;
+        }
+
         const [productsResponse, periodsResponse] = await Promise.all([
             loanProductService.getLoanProducts({ search: '', country: '', page: 1, limit: 100 }),
             interestPeriodService.getInterestPeriods()
@@ -190,7 +215,7 @@ const loadAvailableData = async () => {
 watch(() => props.installmentOption, (newOption) => {
     if (newOption && props.isEdit) {
         form.value = {
-            loanProductId: newOption.loanProductId,
+            loanProductId: props.fixedLoanProductId || newOption.loanProductId,
             interestPeriodId: newOption.interestPeriodId,
             maxInstallments: newOption.maxInstallments
         };
@@ -204,7 +229,7 @@ watch(() => props.show, (newShow) => {
         void loadAvailableData();
         if (props.isEdit && props.installmentOption) {
             form.value = {
-                loanProductId: props.installmentOption.loanProductId,
+                loanProductId: props.fixedLoanProductId || props.installmentOption.loanProductId,
                 interestPeriodId: props.installmentOption.interestPeriodId,
                 maxInstallments: props.installmentOption.maxInstallments
             };

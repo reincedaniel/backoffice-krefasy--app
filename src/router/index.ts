@@ -174,8 +174,7 @@ const routes: RouteRecordRaw[] = [
         },
         {
             path: '/loan-installment-options',
-            name: 'loan-installment-options',
-            component: () => import(/* webpackChunkName: "loan-installment-options" */ '../views/loan-installment-options/index.vue'),
+            redirect: '/loan-products',
             meta: { requiresAuth: true, layout: 'app' }
         },
     {
