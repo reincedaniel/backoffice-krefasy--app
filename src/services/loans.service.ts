@@ -168,8 +168,22 @@ export class LoansService {
     }
 
     // Aprovar empréstimo com Stripe
-    async approveWithStripe(id: string, stripeAccountId: string): Promise<Loan> {
+    /* async approveWithStripeBackup(id: string, stripeAccountId: string): Promise<Loan> {
         const response = await apiService.post<Loan>(`/loans/${id}/approve-with-stripe`, {
+            stripeAccountId
+        });
+
+        if (!response.data) {
+            throw new Error('Erro ao aprovar empréstimo com Stripe');
+        }
+        return response.data;
+    } */
+    // Aprovar empréstimo com Stripe
+    async approveManual(id: string, stripeAccountId: string): Promise<Loan> {
+        /* const response = await apiService.post<Loan>(`/loans/${id}/approve-with-stripe`, {
+            stripeAccountId
+        }); */
+        const response = await apiService.post<Loan>(`/loans/${id}/approve-manual`, {
             stripeAccountId
         });
         if (!response.data) {

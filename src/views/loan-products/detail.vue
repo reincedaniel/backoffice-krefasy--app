@@ -142,11 +142,24 @@
 
                 <!-- Taxas de Juros -->
                 <div class="panel">
-                    <div class="flex items-center justify-between mb-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                             Taxas de Juros
                         </h3>
-                        <span class="badge badge-outline-success">{{ product.interestRates.length }} períodos</span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                :disabled="loading"
+                                @click="openAddInterestRate"
+                            >
+                                <svg class="w-4 h-4 ltr:mr-1 rtl:ml-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Adicionar taxa
+                            </button>
+                            <span class="badge badge-outline-success">{{ product.interestRates.length }} períodos</span>
+                        </div>
                     </div>
                     <div v-if="product.interestRates.length === 0" class="text-center py-8 text-gray-500">
                         Nenhuma taxa de juros configurada
@@ -155,16 +168,34 @@
                         <div
                             v-for="rate in product.interestRates"
                             :key="rate.id"
-                            class="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+                            class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex flex-col"
                         >
                             <div class="flex items-center justify-between mb-2">
                                 <h4 class="font-semibold text-gray-900 dark:text-white">{{ rate.interestPeriod.displayName }}</h4>
                                 <span class="text-2xl font-bold text-primary">{{ rate.ratePercent }}%</span>
                             </div>
-                            <div class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                            <div class="space-y-1 text-sm text-gray-600 dark:text-gray-300 flex-1">
                                 <div>Período: {{ rate.interestPeriod.daysInPeriod }} dias</div>
                                 <div>Válido de: {{ formatDate(rate.effectiveFrom) }}</div>
                                 <div>Válido até: {{ formatDate(rate.effectiveTo) }}</div>
+                            </div>
+                            <div class="flex justify-end gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary btn-sm"
+                                    :disabled="loading"
+                                    @click="editInterestRate(rate)"
+                                >
+                                    Editar
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-danger btn-sm"
+                                    :disabled="loading"
+                                    @click="deleteInterestRate(rate)"
+                                >
+                                    Excluir
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -187,12 +218,26 @@
                             :key="option.id"
                             class="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
                         >
-                            <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center justify-between mb-2 gap-2">
                                 <h4 class="font-semibold text-gray-900 dark:text-white">{{ option.interestPeriod.displayName }}</h4>
-                                <span class="text-2xl font-bold text-success">{{ option.maxInstallments }}x</span>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span
+                                        v-if="installmentInterestRatePercentByOptionId[option.id] != null"
+                                        class="text-2xl font-bold text-primary"
+                                    >
+                                        {{ installmentInterestRatePercentByOptionId[option.id] }}%
+                                    </span>
+                                    <span class="text-2xl font-bold text-success">{{ option.maxInstallments }}x</span>
+                                </div>
                             </div>
-                            <div class="text-sm text-gray-600 dark:text-gray-300">
-                                Período: {{ option.interestPeriod.daysInPeriod }} dias
+                            <div class="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                                <div>Período: {{ option.interestPeriod.daysInPeriod }} dias</div>
+                                <div
+                                    v-if="installmentInterestRatePercentByOptionId[option.id] == null"
+                                    class="text-amber-600 dark:text-amber-500"
+                                >
+                                    Sem taxa de juros para este período — configure na secção Taxas de Juros do produto.
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -228,16 +273,29 @@
                 @close="closeEditModal"
                 @saved="handleProductSaved"
             />
+
+            <LoanInterestRateModal
+                v-if="product"
+                :show="showInterestRateModal"
+                :loan-product-id="product.id"
+                :loan-product-name="product.name"
+                :interest-rate="selectedInterestRate"
+                :is-edit="isEditInterestRate"
+                @close="closeInterestRateModal"
+                @saved="handleInterestRateSaved"
+            />
         </div>
     </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMeta } from '@/composables/use-meta';
-import { loanProductService, type LoanProduct } from '@/services/loan-products.service';
+import { loanProductService, type LoanProduct, type InterestRate } from '@/services/loan-products.service';
+import { loanInterestRateService } from '@/services/loan-interest-rates.service';
 import LoanProductModal from './LoanProductModal.vue';
+import LoanInterestRateModal from './LoanInterestRateModal.vue';
 import Swal from 'sweetalert2';
 
 const route = useRoute();
@@ -248,6 +306,30 @@ const product = ref<LoanProduct | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const showEditModal = ref(false);
+const showInterestRateModal = ref(false);
+const selectedInterestRate = ref<InterestRate | null>(null);
+const isEditInterestRate = ref(false);
+
+function resolveInterestRatePercentForPeriod(rates: InterestRate[], interestPeriodId: string): number | null {
+    const matching = rates.filter((r) => r.interestPeriodId === interestPeriodId);
+    if (matching.length === 0) return null;
+    const now = Date.now();
+    const inWindow = matching.find((r) => {
+        const from = new Date(r.effectiveFrom).getTime();
+        const to = new Date(r.effectiveTo).getTime();
+        return from <= now && now <= to;
+    });
+    return (inWindow ?? matching[0]).ratePercent;
+}
+
+/** Percentagem de juros por opção de parcela (mesmo vínculo que loan-interest-rates: interestPeriodId). */
+const installmentInterestRatePercentByOptionId = computed(() => {
+    const p = product.value;
+    if (!p) return {} as Record<string, number | null>;
+    return Object.fromEntries(
+        p.installmentOptions.map((o) => [o.id, resolveInterestRatePercentForPeriod(p.interestRates, o.interestPeriodId)])
+    );
+});
 
 // Métodos
 const loadProduct = async () => {
@@ -282,6 +364,74 @@ const closeEditModal = () => {
 const handleProductSaved = () => {
     closeEditModal();
     loadProduct();
+};
+
+const openAddInterestRate = () => {
+    selectedInterestRate.value = null;
+    isEditInterestRate.value = false;
+    showInterestRateModal.value = true;
+};
+
+const editInterestRate = (rate: InterestRate) => {
+    selectedInterestRate.value = rate;
+    isEditInterestRate.value = true;
+    showInterestRateModal.value = true;
+};
+
+const closeInterestRateModal = () => {
+    showInterestRateModal.value = false;
+    selectedInterestRate.value = null;
+    isEditInterestRate.value = false;
+};
+
+const handleInterestRateSaved = () => {
+    closeInterestRateModal();
+    void Swal.fire({
+        title: 'Sucesso',
+        text: 'Taxa de juros salva com sucesso.',
+        icon: 'success'
+    });
+    loadProduct();
+};
+
+const deleteInterestRate = async (rate: InterestRate) => {
+    const result = await Swal.fire({
+        title: 'Confirmar exclusão',
+        text: `Remover a taxa de ${rate.ratePercent}% (${rate.interestPeriod.displayName})?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, excluir',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545'
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        const response = await loanInterestRateService.deleteLoanInterestRate(rate.id);
+        if (response.succeeded) {
+            await Swal.fire({
+                title: 'Sucesso',
+                text: 'Taxa de juros excluída.',
+                icon: 'success'
+            });
+            loadProduct();
+        } else {
+            const msg =
+                response.message ||
+                response.description ||
+                response.errors?.join(', ') ||
+                'Não foi possível excluir a taxa.';
+            await Swal.fire({ title: 'Erro', text: msg, icon: 'error' });
+        }
+    } catch (err: any) {
+        console.error('Erro ao excluir taxa de juros:', err);
+        await Swal.fire({
+            title: 'Erro',
+            text: err?.message || 'Erro ao excluir taxa de juros.',
+            icon: 'error'
+        });
+    }
 };
 
 const deleteProduct = async () => {

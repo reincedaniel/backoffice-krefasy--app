@@ -191,7 +191,7 @@ const handleSave = async (data: LoanStatusCreateUpdate) => {
             response = await loanStatusService.createLoanStatus(data);
         }
 
-        if (response.succeeded) {
+        if (response.id || response.data?.id) {
             Swal.fire('Sucesso', 'Status salvo com sucesso!', 'success');
             closeModal();
             loadLoanStatuses();

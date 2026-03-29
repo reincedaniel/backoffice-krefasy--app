@@ -223,9 +223,9 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         }
     };
 
-    const approveWithStripe = async (id: string, stripeAccountId: string) => {
+    const approveManual = async (id: string, stripeAccountId: string) => {
         try {
-            const loan = await loansService.approveWithStripe(id, stripeAccountId);
+            const loan = await loansService.approveManual(id, stripeAccountId);
             const index = loans.value.findIndex(l => l.id === id);
             if (index !== -1) {
                 loans.value[index] = loan;
@@ -440,7 +440,7 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         fetchLoanById,
         fetchLoanStats,
         approveLoan,
-        approveWithStripe,
+        approveManual,
         fetchLoanStatuses,
         fetchParcels,
         fetchParcelById,

@@ -244,13 +244,13 @@
                                 Ver Detalhes
                             </router-link>
 
-                            <router-link
+                            <!-- <router-link
                                 :to="`/loans/edit/${loan.id}`"
                                 class="btn btn-outline-info btn-sm gap-2"
                             >
                                 <icon-edit />
                                 Editar
-                                </router-link>
+                                </router-link> -->
 
                             <button
                                 v-if="canApproveLoan(loan)"
@@ -657,8 +657,8 @@ const exportLoans = async () => {
 
 const quickApprove = async (loan: any) => {
     const { value: stripeAccountId } = await Swal.fire({
-        title: 'Aprovar Empréstimo com Stripe',
-        text: 'Por favor, informe o Stripe Account ID para prosseguir com a aprovação:',
+        title: 'Aprovar Empréstimo Manualmente',
+        /* text: 'Por favor, informe o Stripe Account ID para prosseguir com a aprovação:',
         input: 'text',
         inputLabel: 'Stripe Account ID',
         inputPlaceholder: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
@@ -673,7 +673,7 @@ const quickApprove = async (loan: any) => {
                 return 'Formato inválido. Use um UUID válido.';
             }
             return null;
-        },
+        }, */
         showCancelButton: true,
         confirmButtonText: 'Continuar',
         cancelButtonText: 'Cancelar',
@@ -685,7 +685,7 @@ const quickApprove = async (loan: any) => {
     if (stripeAccountId) {
         const result = await Swal.fire({
             title: 'Confirmar Aprovação',
-            text: `Tem certeza que deseja aprovar o empréstimo ${loan.loanNumber} de ${formatCurrency(loan.requestedAmount, loan.currencySymbol, loan.currencyCode)} com Stripe?`,
+            text: `Tem certeza que deseja aprovar o empréstimo ${loan.loanNumber} de ${formatCurrency(loan.requestedAmount, loan.currencySymbol, loan.currencyCode)}?`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Sim, aprovar!',
@@ -697,7 +697,7 @@ const quickApprove = async (loan: any) => {
         if (result.isConfirmed) {
             try {
                 loading.value = true;
-                await store.approveWithStripe(loan.id, stripeAccountId);
+                await store.approveManual(loan.id, stripeAccountId);
                 await fetchLoans(); // Recarregar dados atualizados
 
                 await Swal.fire({

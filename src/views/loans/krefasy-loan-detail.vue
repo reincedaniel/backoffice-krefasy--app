@@ -64,10 +64,10 @@
                         {{ getActionButtonText() }}
                     </button>
 
-                    <router-link :to="`/loans/edit/${loan.id}`" class="btn btn-warning gap-2">
+                    <!-- <router-link :to="`/loans/edit/${loan.id}`" class="btn btn-warning gap-2">
                         <icon-edit />
                         Editar
-                    </router-link>
+                    </router-link> -->
 
                     <router-link to="/loans" class="btn btn-secondary gap-2">
                         <icon-arrow-left />
@@ -536,8 +536,8 @@
                                                                 {{ getInstallmentStatusLabel(installment) }}
                                                             </span>
                                                             <span
-                                                                v-if="hasComprovativo(installment)"
-                                                                class="ml- inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                                                                v-if="canViewComprovativo(installment)"
+                                                                class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                                                                 title="Tem comprovativo"
                                                             >
                                                                 <icon-file class="w-3.5 h-3.5 mr-0.5" />
@@ -557,7 +557,7 @@
                                                         </td>
                                                         <td>
                                                             <div class="flex flex-wrap items-center gap-1">
-                                                                <template v-if="hasComprovativo(installment)">
+                                                                <template v-if="canViewComprovativo(installment)">
                                                                     <button
                                                                         type="button"
                                                                         class="btn btn-outline-primary btn-sm gap-1"
@@ -579,7 +579,7 @@
                                                                     >
                                                                         Pagar
                                                                     </a>
-                                                                    <button
+                                                                    <!-- <button
                                                                         type="button"
                                                                         class="btn btn-outline-success btn-sm gap-1"
                                                                         title="Marcar como paga (manual)"
@@ -587,9 +587,9 @@
                                                                     >
                                                                         <icon-square-check class="w-4 h-4" />
                                                                         Marcar como paga
-                                                                    </button>
+                                                                    </button> -->
                                                                 </template>
-                                                                <span v-if="!hasComprovativo(installment) && installment.isPaid" class="text-white-dark">—</span>
+                                                                <span v-if="!canViewComprovativo(installment) && installment.isPaid" class="text-white-dark">—</span>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -639,8 +639,8 @@
                 >
                     <DialogOverlay class="fixed inset-0 bg-black/60" />
                 </TransitionChild>
-                <div class="fixed inset-0 overflow-y-auto">
-                    <div class="flex min-h-full items-center justify-center px-4 py-6">
+                <div class="fixed inset-0 overflow-y-auto overscroll-contain">
+                    <div class="flex min-h-full items-start sm:items-center justify-center px-3 py-3 sm:px-4 sm:py-4">
                         <TransitionChild
                             as="template"
                             enter="duration-300 ease-out"
@@ -650,37 +650,74 @@
                             leave-from="opacity-100 scale-100"
                             leave-to="opacity-0 scale-95"
                         >
-                            <DialogPanel class="panel border-0 p-0 rounded-lg overflow-hidden w-full max-w-2xl text-black dark:text-white-dark">
-                                <div class="flex items-center justify-between bg-[#fbfbfb] dark:bg-[#121c2c] ltr:pl-5 rtl:pr-5 py-3 ltr:pr-12 rtl:pl-12">
-                                    <h3 class="text-lg font-bold">
+                            <DialogPanel class="panel border-0 p-0 rounded-lg overflow-hidden w-full max-w-6xl max-h-[calc(100dvh-1.5rem)] flex flex-col text-black dark:text-white-dark my-2 sm:my-4">
+                                <div class="flex shrink-0 items-center justify-between bg-[#fbfbfb] dark:bg-[#121c2c] ltr:pl-5 rtl:pr-5 py-3 ltr:pr-12 rtl:pl-12">
+                                    <h3 class="text-lg font-bold pr-2">
                                         Comprovativo — Parcela {{ selectedProofInstallment ? selectedProofInstallment.installmentNumber : '' }}/{{ loan?.numberOfInstallments }}
                                     </h3>
                                     <button type="button" class="absolute top-3 ltr:right-3 rtl:left-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" @click="closeProofModal">
                                         <icon-x class="w-5 h-5" />
                                     </button>
                                 </div>
-                                <div class="p-5 space-y-4">
-                                    <div v-if="selectedProofInstallment?.url" class="rounded-lg border border-white-dark/20 overflow-hidden bg-gray-100 dark:bg-gray-800">
-                                        <div class="h-[320px] flex flex-col">
-                                            <iframe
-                                                :src="selectedProofInstallment?.url"
-                                                class="flex-1 w-full min-h-0"
-                                                title="Comprovativo de pagamento"
-                                            />
-                                            <a
-                                                :href="selectedProofInstallment?.url"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="inline-flex items-center gap-1 p-2 text-sm text-primary hover:underline"
-                                            >
-                                                <icon-link class="w-4 h-4" />
-                                                Abrir num separador
-                                            </a>
+                                <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 space-y-4">
+                                    <div v-if="proofReceiptsLoading" class="flex flex-col items-center justify-center py-12 gap-3">
+                                        <span class="animate-spin border-4 border-primary border-l-transparent rounded-full w-10 h-10 inline-block"></span>
+                                        <span class="text-sm text-white-dark">A carregar comprovativo...</span>
+                                    </div>
+                                    <div v-else-if="proofReceiptsError" class="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-700 dark:text-red-300 text-sm">
+                                        {{ proofReceiptsError }}
+                                    </div>
+                                    <template v-else>
+                                        <div v-if="proofReceipts.length > 1" class="mb-2">
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Comprovativo</label>
+                                            <select v-model="selectedReceiptId" class="form-select w-full">
+                                                <option v-for="r in proofReceipts" :key="r.id" :value="r.id">
+                                                    {{ r.originalFileName }} — {{ formatDate(r.createdAt) }}
+                                                </option>
+                                            </select>
                                         </div>
-                                    </div>
-                                    <div v-else class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-white-dark">
-                                        Sem URL de comprovativo disponível.
-                                    </div>
+                                        <div v-if="currentProofUrl" class="rounded-lg border border-white-dark/20 overflow-hidden bg-gray-100 dark:bg-gray-800 flex flex-col">
+                                            <div class="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-white-dark/20 bg-white/80 dark:bg-gray-900/40 shrink-0">
+                                                <a
+                                                    :href="currentProofUrl"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="btn btn-outline-primary btn-sm gap-1.5"
+                                                >
+                                                    <icon-link class="w-4 h-4" />
+                                                    Abrir num separador
+                                                </a>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-primary btn-sm gap-1.5"
+                                                    @click="downloadCurrentProof"
+                                                >
+                                                    <icon-download class="w-4 h-4" />
+                                                    Baixar comprovativo
+                                                </button>
+                                            </div>
+                                            <!-- Área fixa: imagem com object-contain (sem scroll extra); PDF/outros em iframe a preencher a caixa -->
+                                            <div
+                                                class="relative w-full h-[min(52vh,600px)] min-h-[260px] max-h-[70vh] overflow-hidden bg-neutral-200/60 dark:bg-neutral-950/40 flex items-center justify-center"
+                                            >
+                                                <img
+                                                    v-if="isCurrentProofImage"
+                                                    :src="currentProofUrl"
+                                                    alt="Comprovativo de pagamento"
+                                                    class="block max-h-full max-w-full w-auto h-auto object-contain object-center p-2 select-none"
+                                                />
+                                                <iframe
+                                                    v-else
+                                                    :src="currentProofPdfUrl"
+                                                    class="absolute inset-0 w-full h-full border-0 bg-white dark:bg-gray-900"
+                                                    title="Comprovativo de pagamento"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div v-else class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-white-dark">
+                                            Sem comprovativo disponível para pré-visualizar.
+                                        </div>
+                                    </template>
                                     <div class="border-t border-white-dark/20 pt-4">
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Decisão do comprovativo</label>
                                         <div class="flex gap-3 mb-3">
@@ -703,23 +740,39 @@
                                                 Não aceite
                                             </button>
                                         </div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrição (obrigatória para Não aceite)</label>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notas / descrição (obrigatória para Não aceite)</label>
                                         <textarea
                                             v-model="proofForm.description"
                                             class="form-textarea w-full min-h-[80px]"
                                             placeholder="Ex.: Comprovativo ilegível; dados não conferem..."
                                             rows="3"
                                         />
+                                        <div v-if="proofForm.accepted === true" class="mt-3">
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valor pago reconhecido</label>
+                                            <input
+                                                v-model.number="proofForm.paidAmount"
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                class="form-input w-full"
+                                            />
+                                        </div>
                                     </div>
                                     <div class="flex justify-end gap-2 pt-2">
-                                        <button type="button" class="btn btn-outline-danger" @click="closeProofModal">Fechar</button>
+                                        <button type="button" class="btn btn-outline-danger" :disabled="proofSubmitting" @click="closeProofModal">Fechar</button>
                                         <button
                                             type="button"
                                             class="btn btn-primary"
-                                            :disabled="proofForm.accepted === null || (proofForm.accepted === false && !proofForm.description.trim())"
+                                            :disabled="
+                                                proofSubmitting ||
+                                                proofReceiptsLoading ||
+                                                proofForm.accepted === null ||
+                                                (proofForm.accepted === false && !proofForm.description.trim()) ||
+                                                proofReviewBlockedNoDocument
+                                            "
                                             @click="saveProofAcceptance"
                                         >
-                                            Guardar
+                                            {{ proofSubmitting ? 'A guardar...' : 'Guardar' }}
                                         </button>
                                     </div>
                                 </div>
@@ -845,6 +898,11 @@ import IconMapPin from '@/components/icon/icon-map-pin.vue';
 import IconLink from '@/components/icon/icon-link.vue';
 import IconX from '@/components/icon/icon-x.vue';
 import { parcelsService } from '@/services/parcels.service';
+import {
+    getInstallmentPaymentReceipts,
+    reviewInstallmentPayment,
+    type InstallmentPaymentReceipt,
+} from '@/services/installment-payments.service';
 
 // Definir interfaces para a nova estrutura da API
 interface CustomerDetails {
@@ -902,6 +960,12 @@ interface Installment {
     createdAt: string;
     paymentMethod?: string | null;
     url?: string | null;
+    /** Nome legível do estado da parcela (ex.: Em Análise) */
+    installmentStatusName?: string | null;
+    statusName?: string | null;
+    /** Código ou texto de estado vindo da API */
+    installmentStatus?: string | null;
+    status?: string | null;
     /** Quando a API enviar: estado do comprovativo (aceite/não aceite) */
     proofAccepted?: boolean | null;
     proofRejectedReason?: string | null;
@@ -953,8 +1017,17 @@ const installmentSortBy = ref<'number' | 'dueDate' | 'amount' | 'amount-asc'>('n
 // Modal Comprovativo
 const showProofModal = ref(false);
 const selectedProofInstallment = ref<Installment | null>(null);
-const proofForm = ref<{ accepted: boolean | null; description: string }>({ accepted: null, description: '' });
+const proofForm = ref<{ accepted: boolean | null; description: string; paidAmount: number }>({
+    accepted: null,
+    description: '',
+    paidAmount: 0,
+});
 const proofAcceptanceMap = ref<Record<string, ProofAcceptanceState>>({});
+const proofReceiptsLoading = ref(false);
+const proofReceipts = ref<InstallmentPaymentReceipt[]>([]);
+const proofReceiptsError = ref('');
+const selectedReceiptId = ref<string | null>(null);
+const proofSubmitting = ref(false);
 
 // Modal Marcar como paga
 const showMarkPaidModal = ref(false);
@@ -1020,6 +1093,139 @@ const overdueInstallmentsCount = computed(() => {
     const installments = loan.value?.installments as Installment[] | undefined;
     if (!installments) return 0;
     return installments.filter((i) => i.isOverdue).length;
+});
+
+/** Compara rótulos como "Em Análise", "Em analise", "Emanalise", UNDER_REVIEW */
+function normalizeInstallmentStatusKey(raw: string): string {
+    return raw
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\s_\-]/g, '')
+        .toLowerCase();
+}
+
+function isInstallmentUnderReview(installment: Installment): boolean {
+    const candidates: string[] = [];
+    if (installment.installmentStatusName) candidates.push(installment.installmentStatusName);
+    if (installment.statusName) candidates.push(installment.statusName);
+    if (installment.installmentStatus) candidates.push(installment.installmentStatus);
+    if (installment.status) {
+        const st = installment.status;
+        if (!/^(PENDING|PAID|OVERDUE|PARTIALLY_PAID|ACTIVE|COMPLETED)$/i.test(st)) {
+            candidates.push(st);
+        }
+    }
+    for (const raw of candidates) {
+        const key = normalizeInstallmentStatusKey(raw);
+        if (key === 'emanalise' || key === 'underreview') return true;
+    }
+    return false;
+}
+
+/** Comprovativo / parcela rejeitada (ex.: status "Rejeitado", REJECTED) */
+function isInstallmentRejected(installment: Installment): boolean {
+    const candidates: string[] = [];
+    if (installment.installmentStatusName) candidates.push(installment.installmentStatusName);
+    if (installment.statusName) candidates.push(installment.statusName);
+    if (installment.installmentStatus) candidates.push(installment.installmentStatus);
+    if (installment.status) candidates.push(installment.status);
+    for (const raw of candidates) {
+        const key = normalizeInstallmentStatusKey(raw);
+        if (
+            key === 'rejeitado' ||
+            key === 'rejected' ||
+            key === 'naoaceite' ||
+            key === 'notaccepted' ||
+            key === 'proofrejected' ||
+            key === 'comprovativorejeitado'
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Parcelas em que o comprovativo pode vir da API (em análise ou rejeitado) */
+function installmentUsesProofReceiptsApi(installment: Installment): boolean {
+    return isInstallmentUnderReview(installment) || isInstallmentRejected(installment);
+}
+
+/** Botão Ver comprovativo: URL direta, em análise ou rejeitado (comprovativo via API) */
+function canViewComprovativo(installment: Installment): boolean {
+    return !!installment?.url || installmentUsesProofReceiptsApi(installment);
+}
+
+const currentProofUrl = computed(() => {
+    if (selectedReceiptId.value && proofReceipts.value.length > 0) {
+        const r = proofReceipts.value.find((x) => x.id === selectedReceiptId.value);
+        if (r?.downloadUrl) return r.downloadUrl;
+    }
+    return selectedProofInstallment.value?.url ?? null;
+});
+
+/** Pré-visualização como <img> com object-contain (evita iframe + scroll duplo para fotos) */
+const isCurrentProofImage = computed(() => {
+    const url = currentProofUrl.value;
+    if (!url) return false;
+    if (selectedReceiptId.value && proofReceipts.value.length > 0) {
+        const r = proofReceipts.value.find((x) => x.id === selectedReceiptId.value);
+        if (r?.contentType && /^image\//i.test(r.contentType)) return true;
+    }
+    return /\.(jpe?g|png|gif|webp|bmp|svg)(\?|#|$)/i.test(url);
+});
+
+/** URL para iframe: PDFs pedem vista “fit” quando o leitor suporta (#view=FitH) */
+const currentProofPdfUrl = computed(() => {
+    const url = currentProofUrl.value;
+    if (!url || isCurrentProofImage.value) return url || '';
+    let isPdf = /\.pdf(\?|#|$)/i.test(url);
+    if (!isPdf && selectedReceiptId.value && proofReceipts.value.length > 0) {
+        const r = proofReceipts.value.find((x) => x.id === selectedReceiptId.value);
+        const ct = r?.contentType?.toLowerCase() ?? '';
+        isPdf = ct === 'application/pdf' || ct === 'application/x-pdf';
+    }
+    if (!isPdf || url.includes('#')) return url;
+    return `${url}#view=FitH`;
+});
+
+/** Nome sugerido para o ficheiro ao baixar (metadados da API ou último segmento da URL) */
+const currentProofFileName = computed(() => {
+    if (selectedReceiptId.value && proofReceipts.value.length > 0) {
+        const r = proofReceipts.value.find((x) => x.id === selectedReceiptId.value);
+        if (r?.originalFileName?.trim()) return r.originalFileName.trim();
+    }
+    const url = currentProofUrl.value;
+    if (!url) return '';
+    try {
+        const u = new URL(url, typeof window !== 'undefined' ? window.location.origin : undefined);
+        const seg = u.pathname.split('/').filter(Boolean).pop();
+        if (seg) return decodeURIComponent(seg.split('?')[0] || seg);
+    } catch {
+        /* ignore */
+    }
+    const n = selectedProofInstallment.value?.installmentNumber;
+    return n != null ? `comprovativo-parcela-${n}` : 'comprovativo';
+});
+
+function downloadCurrentProof() {
+    const url = currentProofUrl.value;
+    if (!url) return;
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    const name = currentProofFileName.value;
+    if (name) link.setAttribute('download', name);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+const proofReviewBlockedNoDocument = computed(() => {
+    const inst = selectedProofInstallment.value;
+    if (!inst) return false;
+    const needsApi = installmentUsesProofReceiptsApi(inst) && !inst.url;
+    return needsApi && !proofReceiptsLoading.value && proofReceipts.value.length === 0;
 });
 
 const filteredInstallments = computed(() => {
@@ -1143,11 +1349,24 @@ const getDocumentTypeLabel = (docType: string) => {
 
 const getInstallmentStatusBadgeClass = (installment: Installment) => {
     if (installment.isPaid) return 'badge-outline-success';
+    if (isInstallmentRejected(installment)) return 'badge-outline-danger';
     if (installment.isOverdue) return 'badge-outline-danger';
+    if (isInstallmentUnderReview(installment)) return 'badge-outline-info';
     return 'badge-outline-warning';
 };
 
 const getInstallmentStatusLabel = (installment: Installment) => {
+    if (installment.installmentStatusName?.trim()) return installment.installmentStatusName.trim();
+    if (installment.statusName?.trim()) return installment.statusName.trim();
+    if (isInstallmentRejected(installment)) {
+        const raw = (installment.installmentStatus || installment.status || '').trim();
+        if (raw) {
+            const upper = raw.toUpperCase();
+            if (upper === 'REJECTED' || upper === 'REJEITADO') return 'Rejeitado';
+            if (!/^(PENDING|PAID|OVERDUE|PARTIALLY_PAID|ACTIVE|COMPLETED)$/i.test(raw)) return raw;
+        }
+        return 'Rejeitado';
+    }
     if (installment.isPaid) return 'Pago';
     if (installment.isOverdue) return 'Atrasado';
     return 'Pendente';
@@ -1158,13 +1377,17 @@ const getInstallmentRowClass = (installment: Installment) => {
     if (installment.isPaid) {
         return `${base} bg-green-50/50 dark:bg-green-900/10 border-l-4 border-l-green-500`;
     }
+    if (isInstallmentRejected(installment)) {
+        return `${base} bg-rose-50/50 dark:bg-rose-900/10 border-l-4 border-l-rose-600`;
+    }
     if (installment.isOverdue) {
         return `${base} bg-red-50/50 dark:bg-red-900/10 border-l-4 border-l-red-500`;
     }
+    if (isInstallmentUnderReview(installment)) {
+        return `${base} bg-sky-50/50 dark:bg-sky-900/10 border-l-4 border-l-sky-500`;
+    }
     return `${base} bg-amber-50/30 dark:bg-amber-900/5 border-l-4 border-l-amber-500`;
 };
-
-const hasComprovativo = (installment: Installment) => !!installment?.url;
 
 const getProofAcceptanceState = (installment: Installment): ProofAcceptanceState | null => {
     const local = proofAcceptanceMap.value[installment.id];
@@ -1175,32 +1398,81 @@ const getProofAcceptanceState = (installment: Installment): ProofAcceptanceState
     return null;
 };
 
-const openProofModal = (installment: Installment) => {
+const openProofModal = async (installment: Installment) => {
     selectedProofInstallment.value = installment;
+    proofReceipts.value = [];
+    proofReceiptsError.value = '';
+    selectedReceiptId.value = null;
     const existing = proofAcceptanceMap.value[installment.id];
     proofForm.value = {
         accepted: existing ? existing.accepted : (installment.proofAccepted ?? null),
-        description: existing?.description ?? installment.proofRejectedReason ?? ''
+        description: existing?.description ?? installment.proofRejectedReason ?? '',
+        paidAmount: installment.amount,
     };
     showProofModal.value = true;
+
+    if (installmentUsesProofReceiptsApi(installment)) {
+        proofReceiptsLoading.value = true;
+        try {
+            const list = await getInstallmentPaymentReceipts(installment.id);
+            proofReceipts.value = list;
+            if (list.length > 0) {
+                selectedReceiptId.value = list[0].id;
+            }
+        } catch (err: any) {
+            if (!installment.url) {
+                proofReceiptsError.value = err.message || 'Erro ao carregar comprovativos';
+            }
+        } finally {
+            proofReceiptsLoading.value = false;
+        }
+    }
 };
 
 const closeProofModal = () => {
     showProofModal.value = false;
     selectedProofInstallment.value = null;
-    proofForm.value = { accepted: null, description: '' };
+    proofForm.value = { accepted: null, description: '', paidAmount: 0 };
+    proofReceipts.value = [];
+    proofReceiptsError.value = '';
+    selectedReceiptId.value = null;
+    proofReceiptsLoading.value = false;
 };
 
-const saveProofAcceptance = () => {
+const saveProofAcceptance = async () => {
     if (!selectedProofInstallment.value) return;
     if (proofForm.value.accepted === false && !proofForm.value.description.trim()) return;
-    proofAcceptanceMap.value[selectedProofInstallment.value.id] = {
-        accepted: proofForm.value.accepted === true,
-        description: proofForm.value.description.trim()
-    };
-    // TODO: chamar API quando existir endpoint (ex.: PATCH /loans/:id/installments/:installmentId/proof)
-    closeProofModal();
-    Swal.fire({ title: 'Guardado', text: 'Decisão do comprovativo guardada.', icon: 'success', timer: 2000, showConfirmButton: false });
+    if (proofForm.value.accepted === null) return;
+    if (proofReviewBlockedNoDocument.value) return;
+
+    const instId = selectedProofInstallment.value.id;
+    proofSubmitting.value = true;
+    try {
+        await reviewInstallmentPayment(instId, {
+            approved: proofForm.value.accepted === true,
+            notes: proofForm.value.description.trim(),
+            paidAmount: proofForm.value.accepted === true ? Number(proofForm.value.paidAmount) || 0 : 0,
+        });
+        delete proofAcceptanceMap.value[instId];
+        closeProofModal();
+        await loadLoanDetails();
+        await Swal.fire({
+            title: 'Guardado',
+            text: 'Revisão do comprovativo registada com sucesso.',
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false,
+        });
+    } catch (err: any) {
+        await Swal.fire({
+            title: 'Erro',
+            text: err.message || 'Não foi possível guardar a revisão.',
+            icon: 'error',
+            confirmButtonColor: '#dc3545',
+        });
+    } finally {
+        proofSubmitting.value = false;
+    }
 };
 
 const openMarkPaidModal = (installment: Installment) => {
@@ -1277,8 +1549,8 @@ const approveLoan = async () => {
     if (!loan.value) return;
 
     const { value: stripeAccountId } = await Swal.fire({
-        title: 'Aprovar Empréstimo com Stripe',
-        text: 'Por favor, informe o Stripe Account ID para prosseguir com a aprovação:',
+        title: 'Aprovar Empréstimo Manualmente',
+        /* text: 'Por favor, informe o Stripe Account ID para prosseguir com a aprovação:',
         input: 'text',
         inputLabel: 'Stripe Account ID',
         inputPlaceholder: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
@@ -1293,7 +1565,7 @@ const approveLoan = async () => {
                 return 'Formato inválido. Use um UUID válido.';
             }
             return null;
-        },
+        }, */
         showCancelButton: true,
         confirmButtonText: 'Aprovar',
         cancelButtonText: 'Cancelar',
@@ -1305,7 +1577,7 @@ const approveLoan = async () => {
     if (stripeAccountId) {
         const result = await Swal.fire({
             title: 'Confirmar Aprovação',
-            text: `Tem certeza que deseja aprovar este empréstimo de ${formatCurrency(loan.value.requestedAmount || loan.value.amount)} com Stripe?`,
+            text: `Tem certeza que deseja aprovar este empréstimo de ${formatCurrency(loan.value.requestedAmount || loan.value.amount)}?`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Sim, aprovar!',
@@ -1317,7 +1589,7 @@ const approveLoan = async () => {
         if (result.isConfirmed) {
             try {
                 loading.value = true;
-                await store.approveWithStripe(loan.value.id, stripeAccountId);
+                await store.approveManual(loan.value.id, stripeAccountId);
                 await loadLoanDetails(); // Recarregar dados atualizados
 
                 await Swal.fire({

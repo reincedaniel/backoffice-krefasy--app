@@ -161,10 +161,10 @@
                                             </li>
 
                                             <!-- Funcionalidades Avançadas -->
-                                            <li class="menu-title mt-4">Avançado</li>
+                                            <!-- <li class="menu-title mt-4">Avançado</li>
                                             <li>
                                                 <router-link to="/loan-interest-rates" @click="toggleMobileMenu">Taxas de Juros</router-link>
-                                            </li>
+                                            </li> -->
                                         </ul>
                                     </vue-collapsible>
                                 </li>

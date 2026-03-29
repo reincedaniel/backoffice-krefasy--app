@@ -91,9 +91,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch } from 'vue';
 import type { LoanInstallmentOption, LoanInstallmentOptionCreateUpdate } from '@/services/loan-installment-options.service';
-import { loanInstallmentOptionService } from '@/services/loan-installment-options.service';
+import { loanProductService } from '@/services/loan-products.service';
+import { interestPeriodService } from '@/services/interest-periods.service';
 
 // Props
 const props = defineProps<{
@@ -164,29 +165,21 @@ const close = () => {
 
 const loadAvailableData = async () => {
     try {
-        // Carregar produtos de empréstimo disponíveis
-        const productsResponse = await loanInstallmentOptionService.getLoanInstallmentOptions();
+        const [productsResponse, periodsResponse] = await Promise.all([
+            loanProductService.getLoanProducts({ search: '', country: '', page: 1, limit: 100 }),
+            interestPeriodService.getInterestPeriods()
+        ]);
+
         if (productsResponse.succeeded && productsResponse.data) {
-            const products = productsResponse.data.map(option => ({
-                id: option.loanProductId,
-                name: option.loanProductName
-            }));
-            availableProducts.value = products.filter((product, index, self) =>
-                index === self.findIndex(p => p.id === product.id)
-            );
+            availableProducts.value = productsResponse.data.map((p) => ({ id: p.id, name: p.name }));
         }
 
-        // Carregar períodos de juros disponíveis
-        const periodsResponse = await loanInstallmentOptionService.getLoanInstallmentOptions();
         if (periodsResponse.succeeded && periodsResponse.data) {
-            const periods = periodsResponse.data.map(option => ({
-                id: option.interestPeriodId,
-                displayName: option.interestPeriod.displayName,
-                daysInPeriod: option.interestPeriod.daysInPeriod
+            availablePeriods.value = periodsResponse.data.map((p) => ({
+                id: p.id,
+                displayName: p.displayName,
+                daysInPeriod: p.daysInPeriod
             }));
-            availablePeriods.value = periods.filter((period, index, self) =>
-                index === self.findIndex(p => p.id === period.id)
-            );
         }
     } catch (error) {
         console.error('Erro ao carregar dados disponíveis:', error);
@@ -208,13 +201,17 @@ watch(() => props.installmentOption, (newOption) => {
 
 watch(() => props.show, (newShow) => {
     if (newShow) {
-        resetForm();
-        loadAvailableData();
+        void loadAvailableData();
+        if (props.isEdit && props.installmentOption) {
+            form.value = {
+                loanProductId: props.installmentOption.loanProductId,
+                interestPeriodId: props.installmentOption.interestPeriodId,
+                maxInstallments: props.installmentOption.maxInstallments
+            };
+            errors.value = {};
+        } else {
+            resetForm();
+        }
     }
-});
-
-// Lifecycle
-onMounted(() => {
-    loadAvailableData();
 });
 </script>
