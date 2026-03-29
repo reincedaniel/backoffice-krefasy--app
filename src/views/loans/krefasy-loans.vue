@@ -70,7 +70,7 @@
                         <label class="form-label">Status</label>
                         <select v-model="filters.status" @change="applyFilters" class="form-select w-full">
                             <option value="">Todos os Status</option>
-                            <option v-for="status in loanStatuses" :key="status.id" :value="status.name">
+                            <option v-for="status in activeLoanStatuses" :key="status.id" :value="status.id">
                                 {{ status.name }}
                             </option>
                         </select>
@@ -79,7 +79,7 @@
                         <label class="form-label">Produto</label>
                         <select v-model="filters.product" @change="applyFilters" class="form-select w-full">
                             <option value="">Todos os Produtos</option>
-                            <option v-for="product in loanProducts" :key="product.id" :value="product.name">
+                            <option v-for="product in loanProducts" :key="product.id" :value="product.id">
                                 {{ product.name }}
                             </option>
                         </select>
@@ -88,8 +88,8 @@
                         <label class="form-label">Moeda</label>
                         <select v-model="filters.currency" @change="applyFilters" class="form-select w-full">
                             <option value="">Todas as Moedas</option>
-                            <option v-for="currency in currencies" :key="currency.id" :value="currency.code">
-                                {{ currency.code }} - {{ currency.name }}
+                            <option v-for="currency in activeCurrencies" :key="currency.id" :value="currency.id">
+                                {{ currency.code }} — {{ currency.name }}
                             </option>
                         </select>
                     </div>
@@ -347,6 +347,8 @@ import { useKrefasyStore } from '@/stores/index';
 import userService from '@/services/users.service';
 import loansService from '@/services/loans.service';
 import authService from '@/services/auth.service';
+import { loanProductService } from '@/services/loan-products.service';
+import { currencyService } from '@/services/currencies.service';
 import Swal from 'sweetalert2';
 
 // Icons
@@ -452,6 +454,14 @@ const visiblePages = computed(() => {
     return pages;
 });
 
+const activeLoanStatuses = computed(() =>
+    loanStatuses.value.filter((s: { isActive?: boolean }) => s.isActive !== false)
+);
+
+const activeCurrencies = computed(() =>
+    currencies.value.filter((c: { isActive?: boolean }) => c.isActive !== false)
+);
+
 // Métodos
 const fetchLoans = async (overrideManagerId?: string) => {
     try {
@@ -465,6 +475,7 @@ const fetchLoans = async (overrideManagerId?: string) => {
         // Adicionar filtros usando os nomes corretos da API
         if (filters.value.status) params.StatusId = filters.value.status;
         if (filters.value.product) params.LoanProductId = filters.value.product;
+        if (filters.value.currency) params.CurrencyId = filters.value.currency;
         // ManagerId: priorizar override explícito (ex: botão Meus Clientes), depois filtro
         if (overrideManagerId) params.ManagerId = overrideManagerId;
         else if (filters.value.managerId) params.ManagerId = filters.value.managerId;
@@ -504,35 +515,40 @@ const fetchLoans = async (overrideManagerId?: string) => {
 
 const fetchFilterData = async () => {
     try {
-        // Buscar status dos empréstimos
-        const statuses = await store.fetchLoanStatuses();
-        loanStatuses.value = statuses || [];
+        const [statuses, productsRes, currenciesRes] = await Promise.all([
+            store.fetchLoanStatuses(),
+            loanProductService.getLoanProducts({
+                search: '',
+                country: '',
+                page: 1,
+                limit: 100
+            }),
+            currencyService.getCurrencies({ page: 1, limit: 100 })
+        ]);
+
+        loanStatuses.value = Array.isArray(statuses) ? statuses : [];
+
+        if (productsRes.succeeded && productsRes.data) {
+            loanProducts.value = productsRes.data;
+        } else {
+            loanProducts.value = [];
+        }
+
+        if (currenciesRes.succeeded && currenciesRes.data) {
+            currencies.value = currenciesRes.data;
+        } else {
+            currencies.value = [];
+        }
 
         // Buscar users para filtro Gestores (API /api/v1/users)
         const usersRes = await userService.getUsers();
         if (usersRes.succeeded && usersRes.data?.data) {
-            managers.value = usersRes.data.data;
+            managers.value = usersRes.data.data.filter(
+                (u: { roles?: string[] }) => !u.roles?.includes('Client')
+            );
         } else {
             managers.value = [];
         }
-
-        // TODO: Implementar busca de produtos e moedas
-        // const products = await store.fetchLoanProducts();
-        // loanProducts.value = products || [];
-
-        // const currencyData = await store.fetchCurrencies();
-        // currencies.value = currencyData || [];
-
-        // Dados estáticos temporários
-        loanProducts.value = [
-            { id: '1', name: 'Crédito Pessoal PT' },
-            { id: '2', name: 'Crédito Pessoal BR' }
-        ];
-
-        currencies.value = [
-            { id: '1', code: 'EUR', name: 'Euro' },
-            { id: '2', code: 'BRL', name: 'Real Brasileiro' }
-        ];
     } catch (error) {
         console.error('Erro ao buscar dados para filtros:', error);
     }
@@ -577,6 +593,7 @@ const filterMyClients = async () => {
         };
         if (filters.value.status) params.StatusId = filters.value.status;
         if (filters.value.product) params.LoanProductId = filters.value.product;
+        if (filters.value.currency) params.CurrencyId = filters.value.currency;
         if (searchQuery.value) params.Search = searchQuery.value;
 
         const response = await loansService.getLoans(params);
