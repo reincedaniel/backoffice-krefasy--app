@@ -208,7 +208,7 @@ npm run build
 ### Variáveis de Ambiente
 ```env
 # API Configuration
-VITE_API_BASE_URL=https://krafasy-credit-api.mayacode.co/api/v1
+VITE_API_BASE_URL=https://credit-staging-api.krefasy.com/api/v1
 VITE_APP_NAME=Krefasy Backoffice
 VITE_APP_VERSION=1.0.0
 ```
