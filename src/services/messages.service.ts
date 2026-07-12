@@ -103,14 +103,81 @@ export interface ConversationStats {
     satisfactionRate: number;
 }
 
+const CONVERSATION_QUERY_KEY_MAP: Record<string, string> = {
+    page: 'Page',
+    limit: 'Limit',
+    status: 'Status',
+    priority: 'Priority',
+    category: 'Category',
+    clientId: 'ClientId',
+    assignedTo: 'AssignedTo',
+    unreadOnly: 'UnreadOnly',
+    startDate: 'StartDate',
+    endDate: 'EndDate',
+    search: 'Search',
+    sortBy: 'SortBy',
+    sortOrder: 'SortOrder',
+    conversationId: 'ConversationId',
+    productType: 'ProductType',
+};
+
+function toCamelCaseKey(key: string): string {
+    if (!key) return key;
+    return key.charAt(0).toLowerCase() + key.slice(1);
+}
+
+export function normalizeApiObject<T>(value: unknown): T {
+    if (value === null || value === undefined) {
+        return value as T;
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((item) => normalizeApiObject(item)) as T;
+    }
+
+    if (typeof value !== 'object') {
+        return value as T;
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+        result[toCamelCaseKey(key)] = normalizeApiObject(nestedValue);
+    }
+    return result as T;
+}
+
+function toConversationQueryParams(params?: object): Record<string, unknown> {
+    if (!params) return {};
+
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === null || value === '') continue;
+        const apiKey = CONVERSATION_QUERY_KEY_MAP[key] ?? key;
+        result[apiKey] = value;
+    }
+    return result;
+}
+
+function toMessageQueryParams(params?: PaginationParams): Record<string, unknown> | undefined {
+    if (!params) return undefined;
+
+    const result: Record<string, unknown> = {};
+    if (params.page !== undefined) result.page = params.page;
+    if (params.limit !== undefined) result.limit = params.limit;
+    if (params.search) result.search = params.search;
+    if (params.sortBy) result.sortBy = params.sortBy;
+    if (params.sortOrder) result.sortOrder = params.sortOrder;
+    return Object.keys(result).length ? result : undefined;
+}
+
 export class MessagesService {
     // Listar conversas com paginação e filtros
     async getConversations(params: PaginationParams & MessageFilters): Promise<ConversationListResponse> {
-        const response = await apiService.get<ConversationListResponse>('/conversations', params);
+        const response = await apiService.get<ConversationListResponse>('/conversations', toConversationQueryParams(params));
         if (!response.data) {
             throw new Error('Dados não encontrados');
         }
-        return response.data;
+        return normalizeApiObject<ConversationListResponse>(response.data);
     }
 
     // Obter conversa por ID
@@ -119,7 +186,7 @@ export class MessagesService {
         if (!response.data) {
             throw new Error('Conversa não encontrada');
         }
-        return response.data;
+        return normalizeApiObject<Conversation>(response.data);
     }
 
     // Criar nova conversa
@@ -128,7 +195,7 @@ export class MessagesService {
         if (!response.data) {
             throw new Error('Erro ao criar conversa');
         }
-        return response.data;
+        return normalizeApiObject<Conversation>(response.data);
     }
 
     // Atualizar conversa
@@ -137,7 +204,7 @@ export class MessagesService {
         if (!response.data) {
             throw new Error('Erro ao atualizar conversa');
         }
-        return response.data;
+        return normalizeApiObject<Conversation>(response.data);
     }
 
     // Fechar conversa
@@ -146,7 +213,7 @@ export class MessagesService {
         if (!response.data) {
             throw new Error('Erro ao fechar conversa');
         }
-        return response.data;
+        return normalizeApiObject<Conversation>(response.data);
     }
 
     // Reabrir conversa
@@ -155,7 +222,7 @@ export class MessagesService {
         if (!response.data) {
             throw new Error('Erro ao reabrir conversa');
         }
-        return response.data;
+        return normalizeApiObject<Conversation>(response.data);
     }
 
     // Atribuir conversa a um admin
@@ -164,40 +231,43 @@ export class MessagesService {
         if (!response.data) {
             throw new Error('Erro ao atribuir conversa');
         }
-        return response.data;
+        return normalizeApiObject<Conversation>(response.data);
     }
 
     // Listar mensagens de uma conversa
     async getMessages(conversationId: string, params?: PaginationParams): Promise<MessageListResponse> {
-        const response = await apiService.get<MessageListResponse>(`/conversations/${conversationId}/messages`, params);
+        const response = await apiService.get<MessageListResponse>(
+            `/conversations/${conversationId}/messages`,
+            toMessageQueryParams(params)
+        );
         if (!response.data) {
             throw new Error('Mensagens não encontradas');
         }
-        return response.data;
+        return normalizeApiObject<MessageListResponse>(response.data);
     }
 
     // Enviar mensagem
     async sendMessage(messageData: CreateMessageRequest): Promise<Message> {
         const formData = new FormData();
-        formData.append('conversationId', messageData.conversationId);
-        formData.append('content', messageData.content);
-        formData.append('messageType', messageData.messageType || 'TEXT');
+        formData.append('ConversationId', messageData.conversationId);
+        formData.append('Content', messageData.content);
+        formData.append('MessageType', messageData.messageType || 'TEXT');
 
         if (messageData.attachments) {
             messageData.attachments.forEach((attachment, index) => {
-                formData.append(`attachments[${index}]`, attachment);
+                formData.append(`Attachments[${index}]`, attachment);
             });
         }
 
         const response = await apiService.post<Message>('/messages', formData, {
             headers: {
-                'Content-Type': 'multipart/form-data'
-            }
+                'Content-Type': 'multipart/form-data',
+            },
         });
         if (!response.data) {
             throw new Error('Erro ao enviar mensagem');
         }
-        return response.data;
+        return normalizeApiObject<Message>(response.data);
     }
 
     // Marcar mensagem como lida
@@ -206,7 +276,7 @@ export class MessagesService {
         if (!response.data) {
             throw new Error('Erro ao marcar mensagem como lida');
         }
-        return response.data;
+        return normalizeApiObject<Message>(response.data);
     }
 
     // Marcar todas as mensagens de uma conversa como lidas
@@ -216,47 +286,53 @@ export class MessagesService {
 
     // Obter estatísticas das conversas
     async getConversationStats(filters?: MessageFilters): Promise<ConversationStats> {
-        const response = await apiService.get<ConversationStats>('/conversations/stats', filters);
+        const response = await apiService.get<ConversationStats>('/conversations/stats', toConversationQueryParams(filters));
         if (!response.data) {
             throw new Error('Estatísticas não encontradas');
         }
-        return response.data;
+        return normalizeApiObject<ConversationStats>(response.data);
     }
 
     // Obter conversas não atribuídas
     async getUnassignedConversations(params?: PaginationParams): Promise<ConversationListResponse> {
-        const response = await apiService.get<ConversationListResponse>('/conversations/unassigned', params);
+        const response = await apiService.get<ConversationListResponse>('/conversations/unassigned', toConversationQueryParams(params));
         if (!response.data) {
             throw new Error('Dados não encontrados');
         }
-        return response.data;
+        return normalizeApiObject<ConversationListResponse>(response.data);
     }
 
     // Obter conversas urgentes
     async getUrgentConversations(params?: PaginationParams): Promise<ConversationListResponse> {
-        const response = await apiService.get<ConversationListResponse>('/conversations/urgent', params);
+        const response = await apiService.get<ConversationListResponse>('/conversations/urgent', toConversationQueryParams(params));
         if (!response.data) {
             throw new Error('Dados não encontrados');
         }
-        return response.data;
+        return normalizeApiObject<ConversationListResponse>(response.data);
     }
 
     // Obter conversas por cliente
     async getConversationsByClient(clientId: string, params?: PaginationParams): Promise<ConversationListResponse> {
-        const response = await apiService.get<ConversationListResponse>(`/clients/${clientId}/conversations`, params);
+        const response = await apiService.get<ConversationListResponse>(
+            `/clients/${clientId}/conversations`,
+            toConversationQueryParams(params)
+        );
         if (!response.data) {
             throw new Error('Dados não encontrados');
         }
-        return response.data;
+        return normalizeApiObject<ConversationListResponse>(response.data);
     }
 
     // Obter conversas por admin
     async getConversationsByAdmin(adminId: string, params?: PaginationParams): Promise<ConversationListResponse> {
-        const response = await apiService.get<ConversationListResponse>(`/admins/${adminId}/conversations`, params);
+        const response = await apiService.get<ConversationListResponse>(
+            `/admins/${adminId}/conversations`,
+            toConversationQueryParams(params)
+        );
         if (!response.data) {
             throw new Error('Dados não encontrados');
         }
-        return response.data;
+        return normalizeApiObject<ConversationListResponse>(response.data);
     }
 
     // Buscar mensagens
@@ -264,31 +340,35 @@ export class MessagesService {
         const response = await apiService.get<MessageListResponse>('/messages/search', {
             query,
             conversationId,
-            ...params
+            ...toMessageQueryParams(params),
         });
         if (!response.data) {
             throw new Error('Resultados da busca não encontrados');
         }
-        return response.data;
+        return normalizeApiObject<MessageListResponse>(response.data);
     }
 
     // Enviar mensagem em massa
     async sendBulkMessage(conversationIds: string[], messageData: { content: string; messageType?: string }): Promise<ApiResponse> {
         const response = await apiService.post('/messages/bulk', {
             conversationIds,
-            ...messageData
+            ...messageData,
         });
         return response;
     }
 
     // Exportar conversas para Excel/CSV
     async exportConversations(filters: MessageFilters, format: 'excel' | 'csv'): Promise<Blob> {
-        const response = await apiService.get<Blob>('/conversations/export', {
-            ...filters,
-            format
-        }, {
-            responseType: 'blob'
-        });
+        const response = await apiService.get<Blob>(
+            '/conversations/export',
+            {
+                ...toConversationQueryParams(filters),
+                format,
+            },
+            {
+                responseType: 'blob',
+            }
+        );
         if (!response.data) {
             throw new Error('Erro ao exportar conversas');
         }
@@ -297,11 +377,15 @@ export class MessagesService {
 
     // Exportar mensagens para Excel/CSV
     async exportMessages(conversationId: string, format: 'excel' | 'csv'): Promise<Blob> {
-        const response = await apiService.get<Blob>(`/conversations/${conversationId}/messages/export`, {
-            format
-        }, {
-            responseType: 'blob'
-        });
+        const response = await apiService.get<Blob>(
+            `/conversations/${conversationId}/messages/export`,
+            {
+                format,
+            },
+            {
+                responseType: 'blob',
+            }
+        );
         if (!response.data) {
             throw new Error('Erro ao exportar mensagens');
         }
@@ -310,12 +394,16 @@ export class MessagesService {
 
     // Gerar relatório de atendimento
     async generateSupportReport(filters: MessageFilters, reportType: 'summary' | 'detailed'): Promise<Blob> {
-        const response = await apiService.get<Blob>('/conversations/report', {
-            ...filters,
-            reportType
-        }, {
-            responseType: 'blob'
-        });
+        const response = await apiService.get<Blob>(
+            '/conversations/report',
+            {
+                ...toConversationQueryParams(filters),
+                reportType,
+            },
+            {
+                responseType: 'blob',
+            }
+        );
         if (!response.data) {
             throw new Error('Erro ao gerar relatório');
         }
@@ -324,11 +412,11 @@ export class MessagesService {
 
     // Configurar notificações em tempo real
     async setupRealTimeNotifications(): Promise<WebSocket> {
-        // Implementar WebSocket para notificações em tempo real
         const raw = localStorage.getItem('USER_LOGIN');
         const data = raw ? JSON.parse(raw) : null;
         const token = data?.token ?? '';
-        const ws = new WebSocket(`wss://krafasy-credit-api.mayacode.co/ws?token=${token}`);
+        const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || 'wss://krafasy-credit-api.mayacode.co/ws';
+        const ws = new WebSocket(`${wsUrl}?token=${token}`);
 
         ws.onopen = () => {
             console.log('WebSocket conectado para notificações');

@@ -6,7 +6,9 @@
     "scripts": {
         "dev": "vite",
         "build": "vue-tsc --noEmit && vite build",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "docker:build": "docker build -t backoffice-krefasy:latest .",
+        "docker:push:hub": "bash scripts/docker-push-hub.sh"
     },
     "dependencies": {
         "@bhplugin/vue3-datatable": "^2.0.0",

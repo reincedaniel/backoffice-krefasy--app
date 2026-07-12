@@ -701,7 +701,7 @@
         {
             userId: 12,
             name: 'Grace Roberts',
-            path: 'user-profile.jpeg',
+            path: 'user-placeholder.svg',
             time: '8:01 PM',
             preview: 'Wasup for the third time like is you bling bitch',
             messages: [],

@@ -1,0 +1,20 @@
+:root {
+    --krefasy-navy: #0e1133;
+    --krefasy-purple: #801f82;
+    --krefasy-purple-hover: #6a1a6c;
+    --krefasy-purple-light: rgba(128, 31, 130, 0.08);
+    --krefasy-surface: #ffffff;
+    --krefasy-surface-muted: #f8fafc;
+    --krefasy-border: #e2e8f0;
+    --krefasy-text: #0e1133;
+    --krefasy-text-muted: #64748b;
+}
+
+.dark {
+    --krefasy-surface: #131629;
+    --krefasy-surface-muted: #0e1133;
+    --krefasy-border: #1e293b;
+    --krefasy-text: #f1f5f9;
+    --krefasy-text-muted: #94a3b8;
+    --krefasy-purple-light: rgba(128, 31, 130, 0.15);
+}

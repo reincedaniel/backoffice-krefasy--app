@@ -1,19 +1,16 @@
 <template>
     <div>
-        <!-- Breadcrumb -->
-        <ul class="flex space-x-2 rtl:space-x-reverse">
-            <li>
-                <router-link to="/dashboard" class="text-primary hover:underline">Dashboard</router-link>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <router-link to="/customers" class="text-primary hover:underline">Clientes</router-link>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>{{ customer?.fullName || 'Carregando...' }}</span>
-            </li>
-        </ul>
+        <PageHeader
+            :title="customer?.fullName || 'Detalhe do Cliente'"
+            subtitle="Informações completas do cliente"
+            :breadcrumbs="[
+                { label: 'Dashboard', to: '/dashboard' },
+                { label: 'Clientes', to: '/customers' },
+                { label: customer?.fullName || 'Detalhe' },
+            ]"
+        />
 
-        <div class="pt-5">
+        <div>
             <!-- Loading State -->
             <div v-if="loading" class="flex items-center justify-center py-12">
                 <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -263,6 +260,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { customerService, type Customer, type CustomerCreateUpdate } from '@/services/customers.service';
 import Swal from 'sweetalert2';
+import PageHeader from '@/components/layout/PageHeader.vue';
 import CustomerModal from './CustomerModal.vue';
 
 const route = useRoute();

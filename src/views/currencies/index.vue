@@ -1,31 +1,21 @@
 <template>
     <div>
-        <!-- Breadcrumb -->
-        <ul class="flex space-x-2 rtl:space-x-reverse">
-            <li>
-                <router-link to="/currencies" class="text-primary hover:underline">Gestão de Moedas</router-link>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>Lista de Moedas</span>
-            </li>
-        </ul>
+        <PageHeader
+            title="Gestão de Moedas"
+            subtitle="Gerencie as moedas disponíveis no sistema"
+            :breadcrumbs="[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Moedas' }]"
+        >
+            <template #actions>
+                <button @click="openCreateModal" class="btn btn-primary" :disabled="loading">
+                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Adicionar Moeda
+                </button>
+            </template>
+        </PageHeader>
 
-        <div class="pt-5">
-            <div class="panel">
-                <div class="flex items-center justify-between mb-5">
-                    <h5 class="font-semibold text-lg dark:text-white-light">Lista de Moedas</h5>
-                    <button
-                        @click="openCreateModal"
-                        class="btn btn-primary"
-                        :disabled="loading"
-                    >
-                        <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                        </svg>
-                        Adicionar Moeda
-                    </button>
-                </div>
-
+        <div class="panel">
                 <!-- Filtros -->
                 <div class="mb-5 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
@@ -186,7 +176,6 @@
                     </div>
                 </div>
             </div>
-        </div>
 
         <!-- Modal de Criação/Edição -->
         <CurrencyModal
@@ -204,6 +193,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMeta } from '@/composables/use-meta';
 import { currencyService, type Currency, type CurrencyFilters } from '@/services/currencies.service';
+import PageHeader from '@/components/layout/PageHeader.vue';
 import CurrencyModal from './CurrencyModal.vue';
 import Swal from 'sweetalert2';
 

@@ -1,16 +1,16 @@
 <template>
     <div>
-        <ul class="flex space-x-2 rtl:space-x-reverse">
-            <li><a href="javascript:;" class="text-primary hover:underline">Dashboard</a></li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <a href="/loans" class="text-primary hover:underline">Empréstimos</a>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>Detalhes</span>
-            </li>
-        </ul>
+        <PageHeader
+            title="Detalhes do Empréstimo"
+            subtitle="Visualize e gerencie todas as informações do empréstimo"
+            :breadcrumbs="[
+                { label: 'Dashboard', to: '/dashboard' },
+                { label: 'Empréstimos', to: '/loans' },
+                { label: 'Detalhes' },
+            ]"
+        />
 
-        <div class="pt-5">
+        <div>
             <!-- Loading State -->
             <div v-if="loading" class="panel">
                 <div class="flex items-center justify-center py-12">
@@ -870,6 +870,7 @@
 </template>
 
 <script lang="ts" setup>
+import PageHeader from '@/components/layout/PageHeader.vue';
 import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMeta } from '@/composables/use-meta';

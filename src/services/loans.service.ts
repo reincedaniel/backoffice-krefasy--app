@@ -115,6 +115,25 @@ export class LoansService {
         };
     }
 
+    async getAllLoansPage(page: number, limit = 100): Promise<LoanListResponse> {
+        return this.getLoans({ page, limit } as PaginationParams & LoanFilters);
+    }
+
+    async getAllLoans(limitPerPage = 100): Promise<Loan[]> {
+        const allLoans: Loan[] = [];
+        let page = 1;
+        let totalPages = 1;
+
+        do {
+            const response = await this.getAllLoansPage(page, limitPerPage);
+            allLoans.push(...response.loans);
+            totalPages = response.totalPages || 1;
+            page += 1;
+        } while (page <= totalPages);
+
+        return allLoans;
+    }
+
     // Obter empréstimo por ID
     async getLoanById(id: string): Promise<Loan> {
         const response = await apiService.get<Loan>(`/loans/${id}`);
@@ -215,15 +234,6 @@ export class LoansService {
         const response = await apiService.post<Loan>(`/loans/${id}/restructure`, restructureData);
         if (!response.data) {
             throw new Error('Erro ao reestruturar empréstimo');
-        }
-        return response.data;
-    }
-
-    // Obter estatísticas dos empréstimos
-    async getLoanStats(filters?: LoanFilters): Promise<LoanStats> {
-        const response = await apiService.get<LoanStats>('/loans/stats', filters);
-        if (!response.data) {
-            throw new Error('Estatísticas não encontradas');
         }
         return response.data;
     }

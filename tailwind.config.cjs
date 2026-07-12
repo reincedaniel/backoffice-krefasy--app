@@ -17,9 +17,14 @@ module.exports = {
         extend: {
             colors: {
                 primary: {
-                    DEFAULT: '#4361ee',
-                    light: '#eaf1ff',
-                    'dark-light': 'rgba(67,97,238,.15)',
+                    DEFAULT: '#801f82',
+                    light: 'rgba(128, 31, 130, 0.08)',
+                    'dark-light': 'rgba(128, 31, 130, 0.15)',
+                },
+                krefasy: {
+                    navy: '#0e1133',
+                    purple: '#801f82',
+                    'purple-hover': '#6a1a6c',
                 },
                 secondary: {
                     DEFAULT: '#805dca',

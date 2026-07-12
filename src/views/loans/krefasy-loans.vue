@@ -1,17 +1,13 @@
 <template>
     <div>
-        <!-- Breadcrumb -->
-        <ul class="flex space-x-2 rtl:space-x-reverse">
-            <li>
-                <a href="javascript:;" class="text-primary hover:underline">Dashboard</a>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>Empréstimos</span>
-            </li>
-        </ul>
+        <PageHeader
+            title="Empréstimos"
+            subtitle="Gerencie a carteira de crédito e acompanhe o status dos empréstimos"
+            :breadcrumbs="[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Empréstimos' }]"
+        />
 
         <!-- Header com Estatísticas -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-5">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="panel">
                 <div class="flex items-center justify-between">
                     <div>
@@ -352,6 +348,7 @@ import { currencyService } from '@/services/currencies.service';
 import Swal from 'sweetalert2';
 
 // Icons
+import PageHeader from '@/components/layout/PageHeader.vue';
 import IconFile from '@/components/icon/icon-file.vue';
 import IconClock from '@/components/icon/icon-clock.vue';
 import IconSquareCheck from '@/components/icon/icon-square-check.vue';

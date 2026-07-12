@@ -1,16 +1,16 @@
 <template>
     <div>
-        <!-- Breadcrumb -->
-        <ul class="flex space-x-2 rtl:space-x-reverse">
-            <li>
-                <router-link to="/loan-products" class="text-primary hover:underline">Produtos de Empréstimo</router-link>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>Detalhes do Produto</span>
-            </li>
-        </ul>
+        <PageHeader
+            title="Detalhes do Produto"
+            subtitle="Configurações e informações do produto de empréstimo"
+            :breadcrumbs="[
+                { label: 'Dashboard', to: '/dashboard' },
+                { label: 'Produtos', to: '/loan-products' },
+                { label: 'Detalhes' },
+            ]"
+        />
 
-        <div class="pt-5">
+        <div>
             <div v-if="loading" class="panel">
                 <div class="flex items-center justify-center py-12">
                     <div class="inline-flex items-center">
@@ -331,6 +331,7 @@
 </template>
 
 <script lang="ts" setup>
+import PageHeader from '@/components/layout/PageHeader.vue';
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMeta } from '@/composables/use-meta';

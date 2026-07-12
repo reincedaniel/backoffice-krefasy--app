@@ -1,46 +1,27 @@
 <template>
     <div>
-        <!-- Breadcrumb -->
-        <ul class="flex space-x-2 rtl:space-x-reverse">
-            <li>
-                <router-link to="/dashboard" class="text-primary hover:underline">Dashboard</router-link>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>Relatórios</span>
-            </li>
-        </ul>
+        <PageHeader
+            title="Relatórios e Analytics"
+            subtitle="Acompanhe o desempenho financeiro e operacional"
+            :breadcrumbs="[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Relatórios' }]"
+        >
+            <template #actions>
+                <button type="button" class="btn btn-outline-primary" @click="exportReport">
+                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Exportar
+                </button>
+                <button type="button" class="btn btn-primary" @click="refreshData">
+                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Atualizar
+                </button>
+            </template>
+        </PageHeader>
 
-        <div class="pt-5">
-            <!-- Header -->
-            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                <div>
-                    <h2 class="text-2xl font-bold dark:text-white-light">Relatórios e Analytics</h2>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Acompanhe o desempenho financeiro e operacional</p>
-                </div>
-                <div class="flex gap-4">
-                    <button
-                        type="button"
-                        class="btn btn-outline-primary"
-                        @click="exportReport"
-                    >
-                        <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        Exportar
-                    </button>
-                    <button
-                        type="button"
-                        class="btn btn-primary"
-                        @click="refreshData"
-                    >
-                        <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                        Atualizar
-                    </button>
-                </div>
-            </div>
-
+        <div>
             <!-- Filtros de Período -->
             <div class="panel mb-6">
                 <div class="flex flex-wrap items-center gap-4">
@@ -373,6 +354,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/layout/PageHeader.vue';
 import { ref, onMounted, nextTick } from 'vue';
 
 // Refs

@@ -1,20 +1,19 @@
 <template>
     <div>
-        <!-- Cabeçalho da página -->
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div>
-                <h4 class="text-2xl font-semibold dark:text-white-light">Países</h4>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Gerencie os países disponíveis para empréstimos</p>
-            </div>
-            <div class="flex gap-4">
+        <PageHeader
+            title="Países"
+            subtitle="Gerencie os países disponíveis para empréstimos"
+            :breadcrumbs="[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Países' }]"
+        >
+            <template #actions>
                 <button type="button" class="btn btn-primary" @click="openModal">
                     <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                     </svg>
                     Adicionar País
                 </button>
-            </div>
-        </div>
+            </template>
+        </PageHeader>
 
         <!-- Filtros -->
         <div class="mb-6">
@@ -136,6 +135,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { countryService, type Country, type CountryCreateUpdate } from '@/services/countries.service';
 import Swal from 'sweetalert2';
+import PageHeader from '@/components/layout/PageHeader.vue';
 import CountryModal from './CountryModal.vue';
 
 // Refs

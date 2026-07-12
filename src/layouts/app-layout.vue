@@ -62,7 +62,7 @@
                 <!--  END TOP NAVBAR  -->
 
                 <!--  BEGIN CONTENT AREA  -->
-                <div class="p-6 animation">
+                <div class="p-4 md:p-6 animation bg-[var(--krefasy-surface-muted)] flex-1">
                     <router-view></router-view>
                 </div>
                 <!--  END CONTENT AREA  -->
@@ -75,17 +75,21 @@
     </div>
 </template>
 <script setup lang="ts">
-    import { ref, onMounted } from 'vue';
+    import { ref, onMounted, onUnmounted } from 'vue';
     import Sidebar from '@/components/layout/Sidebar.vue';
     import Header from '@/components/layout/Header.vue';
     import Footer from '@/components/layout/Footer.vue';
     import Setting from '@/components/ThemeCustomizer.vue';
     import appSetting from '@/app-setting';
+    import { useChatNotifications } from '@/composables/use-chat-notifications';
 
     import { useAppStore } from '@/stores/index';
     const store = useAppStore();
+    const { startPolling, stopPolling } = useChatNotifications();
     const showTopButton = ref(false);
     onMounted(() => {
+        startPolling();
+
         window.onscroll = () => {
             if (document.body.scrollTop > 50 || document.documentElement.scrollTop > 50) {
                 showTopButton.value = true;
@@ -99,6 +103,10 @@
             appSetting.changeAnimation('remove');
         });
         store.toggleMainLoader();
+    });
+
+    onUnmounted(() => {
+        stopPolling();
     });
 
     const goToTop = () => {

@@ -1,57 +1,33 @@
 <template>
     <div>
-        <!-- Breadcrumb -->
-        <ul class="flex space-x-2 rtl:space-x-reverse">
-            <li>
-                <router-link to="/dashboard" class="text-primary hover:underline">Dashboard</router-link>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>Clientes</span>
-            </li>
-        </ul>
+        <PageHeader
+            title="Gestão de Clientes"
+            subtitle="Gerencie todos os customers do sistema"
+            :breadcrumbs="[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Clientes' }]"
+        >
+            <template #actions>
+                <button type="button" class="btn btn-outline-primary" @click="exportCustomers">
+                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Exportar
+                </button>
+                <button type="button" class="btn btn-outline-primary" @click="showImportModal = true">
+                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                    </svg>
+                    Importar
+                </button>
+                <button type="button" class="btn btn-primary" @click="openModal">
+                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Novo Clientes
+                </button>
+            </template>
+        </PageHeader>
 
-        <div class="pt-5">
-            <!-- Header da página -->
-            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-                <div>
-                    <h4 class="text-2xl font-semibold dark:text-white-light">Gestão de Clientes</h4>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Gerencie todos os customers do sistema</p>
-                </div>
-                <div class="flex gap-4">
-                    <button
-                        type="button"
-                        class="btn btn-outline-primary"
-                        @click="exportCustomers"
-                    >
-                        <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        Exportar
-                    </button>
-                    <button
-                        type="button"
-                        class="btn btn-outline-primary"
-                        @click="showImportModal = true"
-                    >
-                        <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-                        </svg>
-                        Importar
-                    </button>
-                    <button
-                        type="button"
-                        class="btn btn-primary"
-                        @click="openModal"
-                    >
-                        <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                        </svg>
-                        Novo Clientes
-                    </button>
-                </div>
-            </div>
-
-            <!-- Filtros -->
+        <div>
             <div class="mb-6">
                 <div class="flex flex-wrap gap-4">
                     <div class="flex-1 min-w-64">
@@ -233,6 +209,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { customerService, type Customer, type CustomerCreateUpdate } from '@/services/customers.service';
 import Swal from 'sweetalert2';
+import PageHeader from '@/components/layout/PageHeader.vue';
 import CustomerModal from './CustomerModal.vue';
 
 const router = useRouter();

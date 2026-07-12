@@ -1,20 +1,19 @@
 <template>
     <div>
-        <!-- Cabeçalho da página -->
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div>
-                <h4 class="text-2xl font-semibold dark:text-white-light">Taxas de Juros</h4>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Gerencie as taxas de juros para diferentes produtos e períodos</p>
-            </div>
-            <div class="flex gap-4">
+        <PageHeader
+            title="Taxas de Juros"
+            subtitle="Gerencie as taxas de juros para diferentes produtos e períodos"
+            :breadcrumbs="[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Taxas de Juros' }]"
+        >
+            <template #actions>
                 <button type="button" class="btn btn-primary" @click="openModal">
                     <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                     </svg>
                     Adicionar Taxa
                 </button>
-            </div>
-        </div>
+            </template>
+        </PageHeader>
 
         <!-- Informação -->
         <div class="mb-6">
@@ -63,6 +62,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/layout/PageHeader.vue';
 import { ref } from 'vue';
 
 // Refs

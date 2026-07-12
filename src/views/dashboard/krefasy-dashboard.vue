@@ -1,229 +1,211 @@
 <template>
-    <div>
-        <!-- Breadcrumb -->
-        <ul class="flex space-x-2 rtl:space-x-reverse">
-            <li>
-                <a href="javascript:;" class="text-primary hover:underline">Dashboard</a>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>Krefasy</span>
-            </li>
-        </ul>
+    <div class="dashboard">
+        <PageHeader
+            title="Visão Geral"
+            subtitle="Acompanhe os indicadores e operações do backoffice em tempo real"
+            :breadcrumbs="[{ label: 'Dashboard' }, { label: 'Krefasy' }]"
+        >
+            <template #actions>
+                <button class="btn-refresh" :disabled="loading || chartsLoading" @click="loadDashboardData">
+                    <span class="refresh-icon" :class="{ spinning: loading }">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                        </svg>
+                    </span>
+                    Atualizar
+                </button>
+            </template>
+        </PageHeader>
 
-        <div class="pt-5">
-            <!-- KPIs Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
-                <!-- Total de Clientes -->
-                <div class="panel h-full">
-                    <div class="flex items-center justify-between dark:text-white-light mb-5">
-                        <h5 class="font-semibold text-lg">Total de Clientes</h5>
-                        <div class="w-11 h-11 text-primary bg-primary-light dark:bg-primary dark:text-primary-light grid place-content-center rounded-full">
-                            <icon-users />
-                        </div>
+        <!-- KPIs -->
+        <div class="kpi-grid">
+            <div v-for="kpi in kpiCards" :key="kpi.label" class="kpi-card" :class="kpi.accent">
+                <div class="kpi-top">
+                    <div class="kpi-icon">
+                        <component :is="kpi.icon" />
                     </div>
-                    <div class="flex items-center">
-                        <span class="text-3xl font-bold text-primary">{{ dashboardStats.totalClients.toLocaleString('pt-BR') }}</span>
-                        <span class="text-success text-sm font-medium ml-2">+12%</span>
-                    </div>
-                    <p class="text-white-dark text-sm mt-2">Este mês</p>
                 </div>
-
-                <!-- Empréstimos Ativos -->
-                <div class="panel h-full">
-                    <div class="flex items-center justify-between dark:text-white-light mb-5">
-                        <h5 class="font-semibold text-lg">Empréstimos Ativos</h5>
-                        <div class="w-11 h-11 text-success bg-success-light dark:bg-success dark:text-success-light grid place-content-center rounded-full">
-                            <icon-trending-up />
-                        </div>
-                    </div>
-                    <div class="flex items-center">
-                        <span class="text-3xl font-bold text-success">{{ dashboardStats.activeLoans.toLocaleString('pt-BR') }}</span>
-                        <span class="text-success text-sm font-medium ml-2">+8%</span>
-                    </div>
-                    <p class="text-white-dark text-sm mt-2">Este mês</p>
-                </div>
-
-                <!-- Valor Total Emprestado -->
-                <div class="panel h-full">
-                    <div class="flex items-center justify-between dark:text-white-light mb-5">
-                        <h5 class="font-semibold text-lg">Valor Total</h5>
-                        <div class="w-11 h-11 text-warning bg-warning-light dark:bg-warning dark:text-warning-light grid place-content-center rounded-full">
-                            <icon-dollar-sign />
-                        </div>
-                    </div>
-                    <div class="flex items-center">
-                        <span class="text-3xl font-bold text-warning">R$ {{ (dashboardStats.totalAmount / 1000000).toFixed(1) }}M</span>
-                        <span class="text-success text-sm font-medium ml-2">+15%</span>
-                    </div>
-                    <p class="text-white-dark text-sm mt-2">Este mês</p>
-                </div>
-
-                <!-- Taxa de Inadimplência -->
-                <div class="panel h-full">
-                    <div class="flex items-center justify-between dark:text-white-light mb-5">
-                        <h5 class="font-semibold text-lg">Taxa de Inadimplência</h5>
-                        <div class="w-11 h-11 text-danger bg-danger-light dark:bg-danger dark:text-danger-light grid place-content-center rounded-full">
-                            <icon-info-triangle />
-                        </div>
-                    </div>
-                    <div class="flex items-center">
-                        <span class="text-3xl font-bold text-danger">{{ dashboardStats.defaultRate.toFixed(1) }}%</span>
-                        <span class="text-success text-sm font-medium ml-2">-2%</span>
-                    </div>
-                    <p class="text-white-dark text-sm mt-2">Este mês</p>
-                </div>
+                <p class="kpi-label">{{ kpi.label }}</p>
+                <p class="kpi-value">
+                    <template v-if="loading">
+                        <span class="skeleton skeleton-value"></span>
+                    </template>
+                    <template v-else>{{ kpi.value }}</template>
+                </p>
             </div>
+        </div>
 
-            <!-- Gráficos -->
-            <div class="grid xl:grid-cols-2 gap-6 mb-6">
-                <!-- Evolução de Empréstimos -->
-                <div class="panel h-full">
-                    <div class="flex items-center justify-between dark:text-white-light mb-5">
-                        <h5 class="font-semibold text-lg">Evolução de Empréstimos</h5>
-                        <div class="dropdown ltr:ml-auto rtl:mr-auto">
-                            <Popper :placement="store.rtlClass === 'rtl' ? 'bottom-start' : 'bottom-end'" offsetDistance="0" class="align-middle">
-                                <a href="javascript:;">
-                                    <icon-horizontal-dots class="text-black/70 dark:text-white/70 hover:!text-primary" />
-                                </a>
-                                <template #content="{ close }">
-                                    <ul @click="close()">
-                                        <li>
-                                            <a href="javascript:;">Mensal</a>
-                                        </li>
-                                        <li>
-                                            <a href="javascript:;">Trimestral</a>
-                                        </li>
-                                        <li>
-                                            <a href="javascript:;">Anual</a>
-                                        </li>
-                                    </ul>
-                                </template>
-                            </Popper>
-                        </div>
-                    </div>
-                    <div class="relative">
-                        <apexchart height="325" :options="loansChart" :series="loansSeries" class="bg-white dark:bg-black rounded-lg overflow-hidden">
-                            <!-- loader -->
-                            <div class="min-h-[325px] grid place-content-center bg-white-light/30 dark:bg-dark dark:bg-opacity-[0.08]">
-                                <span
-                                    class="animate-spin border-2 border-black dark:border-white !border-l-transparent rounded-full w-5 h-5 inline-flex"
-                                ></span>
-                            </div>
-                        </apexchart>
-                    </div>
-                </div>
-
-                <!-- Distribuição por Produto -->
-                <div class="panel h-full">
-                    <div class="flex items-center mb-5">
-                        <h5 class="font-semibold text-lg dark:text-white-light">Distribuição por Produto</h5>
-                    </div>
+        <!-- Gráficos -->
+        <div class="charts-grid">
+            <div class="dash-panel">
+                <div class="panel-header">
                     <div>
-                        <apexchart
-                            height="460"
-                            :options="productChart"
-                            :series="productSeries"
-                            class="bg-white dark:bg-black rounded-lg overflow-hidden"
-                        >
-                            <!-- loader -->
-                            <div class="min-h-[460px] grid place-content-center bg-white-light/30 dark:bg-dark dark:bg-opacity-[0.08]">
-                                <span
-                                    class="animate-spin border-2 border-black dark:border-white !border-l-transparent rounded-full w-5 h-5 inline-flex"
-                                ></span>
-                            </div>
-                        </apexchart>
+                        <h2 class="panel-title">Evolução de Empréstimos</h2>
+                        <p class="panel-subtitle">Quantidade de empréstimos criados — últimos 12 meses</p>
                     </div>
+                </div>
+                <div class="chart-wrap">
+                    <div v-if="chartsLoading" class="chart-loader">
+                        <span class="spinner"></span>
+                        <p class="chart-loading-text">A carregar gráfico...</p>
+                    </div>
+                    <div v-else-if="!hasChartData" class="chart-empty">
+                        <p>Sem dados de empréstimos para o período</p>
+                    </div>
+                    <apexchart
+                        v-else
+                        height="325"
+                        :options="loansChart"
+                        :series="loansSeries"
+                        class="rounded-xl overflow-hidden"
+                    />
                 </div>
             </div>
 
-            <!-- Tabelas Rápidas -->
-            <div class="grid xl:grid-cols-2 gap-6 mb-6">
-                <!-- Empréstimos Pendentes -->
-                <div class="panel h-full">
-                    <div class="flex items-center justify-between dark:text-white-light mb-5">
-                        <h5 class="font-semibold text-lg">Empréstimos Pendentes</h5>
-                        <a href="/loans/pending" class="text-primary hover:underline text-sm">Ver todos</a>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Cliente</th>
-                                    <th>Valor</th>
-                                    <th>Status</th>
-                                    <th>Ação</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="loan in pendingLoans.slice(0, 5)" :key="loan.id">
-                                    <td>{{ loan.clientName }}</td>
-                                    <td>R$ {{ (loan.amount / 1000).toFixed(1) }}k</td>
-                                    <td>
-                                        <span class="badge badge-outline-warning">Pendente</span>
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-sm btn-primary" @click="viewLoan(loan.id)">
-                                            Ver
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+            <div class="dash-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Distribuição por Produto</h2>
+                        <p class="panel-subtitle">Composição da carteira de crédito</p>
                     </div>
                 </div>
+                <div class="chart-wrap">
+                    <div v-if="chartsLoading" class="chart-loader chart-loader-lg">
+                        <span class="spinner"></span>
+                        <p class="chart-loading-text">A carregar gráfico...</p>
+                    </div>
+                    <div v-else-if="!hasChartData" class="chart-empty chart-empty-lg">
+                        <p>Sem dados de produtos para exibir</p>
+                    </div>
+                    <apexchart
+                        v-else
+                        height="400"
+                        :options="productChart"
+                        :series="productSeries"
+                        class="rounded-xl overflow-hidden"
+                    />
+                </div>
+            </div>
+        </div>
 
-                <!-- Parcelas Vencendo -->
-                <div class="panel h-full">
-                    <div class="flex items-center justify-between dark:text-white-light mb-5">
-                        <h5 class="font-semibold text-lg">Parcelas Vencendo</h5>
-                        <a href="/parcels/overdue" class="text-primary hover:underline text-sm">Ver todas</a>
+        <!-- Tabelas -->
+        <div class="tables-grid">
+            <div class="dash-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Empréstimos Pendentes</h2>
+                        <p class="panel-subtitle">Aguardando análise ou aprovação</p>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Cliente</th>
-                                    <th>Valor</th>
-                                    <th>Vencimento</th>
-                                    <th>Ação</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="parcel in overdueParcels.slice(0, 5)" :key="parcel.id">
-                                    <td>{{ parcel.clientName }}</td>
-                                    <td>R$ {{ (parcel.amount / 1000).toFixed(1) }}k</td>
-                                    <td>
-                                        <span class="text-danger">{{ formatDate(parcel.dueDate) }}</span>
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-sm btn-warning" @click="viewParcel(parcel.id)">
-                                            Ver
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <router-link to="/loans/pending" class="panel-link">Ver todos</router-link>
+                </div>
+
+                <div v-if="loading" class="table-skeleton">
+                    <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
+                </div>
+                <div v-else-if="pendingLoans.length === 0" class="empty-state">
+                    <icon-check-circle class="empty-icon success" />
+                    <p>Nenhum empréstimo pendente</p>
+                </div>
+                <div v-else class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Valor</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="loan in pendingLoans.slice(0, 5)" :key="loan.id">
+                                <td>
+                                    <span class="client-name">{{ loan.customerName || loan.clientName || '—' }}</span>
+                                </td>
+                                <td><span class="amount">R$ {{ formatAmount(loan.requestedAmount ?? loan.amount ?? 0) }}</span></td>
+                                <td><span class="badge badge-pending">Pendente</span></td>
+                                <td class="text-right">
+                                    <button class="btn-action" @click="viewLoan(loan.id)">Ver</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <!-- Atividade Recente -->
-            <div class="panel">
-                <div class="flex items-center justify-between dark:text-white-light mb-5">
-                    <h5 class="font-semibold text-lg">Atividade Recente</h5>
-                    <a href="/activity" class="text-primary hover:underline text-sm">Ver todas</a>
-                </div>
-                <div class="space-y-4">
-                    <div v-for="activity in recentActivity" :key="activity.id" class="flex items-center space-x-4 p-3 bg-gray-50 dark:bg-dark-light rounded-lg">
-                        <div class="w-10 h-10 rounded-full bg-primary-light dark:bg-primary flex items-center justify-center">
-                            <component :is="activity.icon" class="w-5 h-5 text-primary" />
-                        </div>
-                        <div class="flex-1">
-                            <p class="font-medium dark:text-white-light">{{ activity.title }}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">{{ activity.description }}</p>
-                        </div>
-                        <span class="text-xs text-gray-500">{{ formatTimeAgo(activity.timestamp) }}</span>
+            <div class="dash-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 class="panel-title">Parcelas Vencendo</h2>
+                        <p class="panel-subtitle">Pagamentos em atraso ou próximos do vencimento</p>
                     </div>
+                    <router-link to="/parcels/overdue" class="panel-link">Ver todas</router-link>
+                </div>
+
+                <div v-if="loading" class="table-skeleton">
+                    <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
+                </div>
+                <div v-else-if="overdueParcels.length === 0" class="empty-state">
+                    <icon-check-circle class="empty-icon success" />
+                    <p>Nenhuma parcela vencida</p>
+                </div>
+                <div v-else class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Valor</th>
+                                <th>Vencimento</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="parcel in overdueParcels.slice(0, 5)" :key="parcel.id">
+                                <td>
+                                    <span class="client-name">{{ parcel.clientName }}</span>
+                                </td>
+                                <td><span class="amount">R$ {{ formatAmount(parcel.amount) }}</span></td>
+                                <td><span class="due-date">{{ formatDate(parcel.dueDate) }}</span></td>
+                                <td class="text-right">
+                                    <button class="btn-action btn-action-warning" @click="viewParcel(parcel.loanId)">Ver</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Atividade Recente -->
+        <div class="dash-panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">Atividade Recente</h2>
+                    <p class="panel-subtitle">Empréstimos pendentes e parcelas em atraso</p>
+                </div>
+            </div>
+
+            <div v-if="loading" class="table-skeleton">
+                <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
+            </div>
+            <div v-else-if="recentActivity.length === 0" class="empty-state">
+                <icon-check-circle class="empty-icon success" />
+                <p>Nenhuma atividade recente</p>
+            </div>
+            <div v-else class="activity-list">
+                <div v-for="(activity, index) in recentActivity" :key="activity.id" class="activity-item">
+                    <div class="activity-track">
+                        <div class="activity-dot" :class="activity.type"></div>
+                        <div v-if="index < recentActivity.length - 1" class="activity-line"></div>
+                    </div>
+                    <div class="activity-icon" :class="activity.type">
+                        <component :is="activity.icon" />
+                    </div>
+                    <div class="activity-content">
+                        <p class="activity-title">{{ activity.title }}</p>
+                        <p class="activity-desc">{{ activity.description }}</p>
+                    </div>
+                    <span class="activity-time">{{ formatTimeAgo(activity.timestamp) }}</span>
                 </div>
             </div>
         </div>
@@ -231,231 +213,761 @@
 </template>
 
 <script lang="ts" setup>
+import PageHeader from '@/components/layout/PageHeader.vue';
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useKrefasyStore } from '@/stores/index';
-import { useAppStore } from '@/stores/index';
+import { loansService } from '@/services/loans.service';
+import {
+    fetchAllLoans,
+    buildMonthlyLoansEvolution,
+    buildProductDistribution,
+    buildRecentActivity,
+    filterPendingLoans,
+    fetchOverdueInstallments,
+    type DashboardInstallment,
+} from '@/utils/dashboard-charts.utils';
 import IconUsers from '@/components/icon/icon-users.vue';
 import IconTrendingUp from '@/components/icon/icon-trending-up.vue';
 import IconDollarSign from '@/components/icon/icon-dollar-sign.vue';
 import IconInfoTriangle from '@/components/icon/icon-info-triangle.vue';
-import IconHorizontalDots from '@/components/icon/icon-horizontal-dots.vue';
-import IconUserPlus from '@/components/icon/icon-user-plus.vue';
 import IconCheckCircle from '@/components/icon/icon-square-check.vue';
 import IconAlertCircle from '@/components/icon/icon-info-triangle.vue';
 
-// Router e Stores
+const KREFASY_NAVY = '#0e1133';
+const KREFASY_PURPLE = '#801f82';
+const KREFASY_PURPLE_LIGHT = '#a832aa';
+
 const router = useRouter();
 const krefasyStore = useKrefasyStore();
-const store = useAppStore();
 
-// Estado
 const loading = ref(false);
+const chartsLoading = ref(false);
+const hasChartData = ref(false);
 const pendingLoans = ref<any[]>([]);
-const overdueParcels = ref<any[]>([]);
+const overdueParcels = ref<DashboardInstallment[]>([]);
 const recentActivity = ref<any[]>([]);
 
-// Computed
 const dashboardStats = computed(() => krefasyStore.dashboardStats);
 
-// Configuração dos gráficos
+const kpiCards = computed(() => [
+    {
+        label: 'Total de Clientes',
+        value: dashboardStats.value.totalClients.toLocaleString('pt-BR'),
+        icon: IconUsers,
+        accent: 'accent-purple',
+    },
+    {
+        label: 'Empréstimos Ativos',
+        value: dashboardStats.value.activeLoans.toLocaleString('pt-BR'),
+        icon: IconTrendingUp,
+        accent: 'accent-navy',
+    },
+    {
+        label: 'Valor Total Emprestado',
+        value: `R$ ${(dashboardStats.value.totalAmount / 1000000).toFixed(1)}M`,
+        icon: IconDollarSign,
+        accent: 'accent-gold',
+    },
+    {
+        label: 'Taxa de Inadimplência',
+        value: `${dashboardStats.value.defaultRate.toFixed(1)}%`,
+        icon: IconInfoTriangle,
+        accent: 'accent-danger',
+    },
+]);
+
 const loansChart = ref({
     chart: {
         type: 'area',
         height: 325,
-        toolbar: {
-            show: false,
+        toolbar: { show: false },
+        fontFamily: 'inherit',
+    },
+    dataLabels: { enabled: false },
+    stroke: { curve: 'smooth', width: 2.5 },
+    fill: {
+        type: 'gradient',
+        gradient: {
+            shadeIntensity: 1,
+            opacityFrom: 0.35,
+            opacityTo: 0.02,
+            stops: [0, 90, 100],
         },
     },
-    dataLabels: {
-        enabled: false,
-    },
-    stroke: {
-        curve: 'smooth',
-        width: 3,
-    },
-    colors: ['#4361ee'],
-    series: [
-        {
-            name: 'Empréstimos',
-            data: [30, 40, 35, 50, 49, 60, 70, 91, 125, 150, 180, 200],
-        },
-    ],
+    colors: [KREFASY_PURPLE],
     xaxis: {
         categories: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+        labels: { style: { colors: '#94a3b8', fontSize: '12px' } },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
     },
-    tooltip: {
-        theme: 'dark',
+    yaxis: {
+        labels: { style: { colors: '#94a3b8', fontSize: '12px' } },
     },
+    grid: {
+        borderColor: '#f1f5f9',
+        strokeDashArray: 4,
+    },
+    tooltip: { theme: 'dark' },
 });
 
 const loansSeries = ref([
-    {
-        name: 'Empréstimos',
-        data: [30, 40, 35, 50, 49, 60, 70, 91, 125, 150, 180, 200],
-    },
+    { name: 'Empréstimos', data: [] as number[] },
 ]);
 
 const productChart = ref({
     chart: {
         type: 'donut',
-        height: 460,
+        height: 400,
+        fontFamily: 'inherit',
     },
-    colors: ['#4361ee', '#805dca', '#00ab55', '#e2a03f', '#e7515a'],
-    series: [44, 55, 13, 33, 22],
-    labels: ['Pessoal', 'Empresarial', 'Hipotecário', 'Veículo', 'Educação'],
+    colors: [KREFASY_PURPLE, KREFASY_NAVY, KREFASY_PURPLE_LIGHT, '#5c1760', '#6366f1'],
+    labels: [] as string[],
     legend: {
         position: 'bottom',
+        fontSize: '13px',
+        labels: { colors: '#64748b' },
     },
-    tooltip: {
-        theme: 'dark',
+    plotOptions: {
+        pie: {
+            donut: {
+                size: '72%',
+                labels: {
+                    show: true,
+                    name: { fontSize: '14px', color: '#64748b' },
+                    value: { fontSize: '22px', fontWeight: 700, color: KREFASY_NAVY },
+                    total: {
+                        show: true,
+                        label: 'Total',
+                        fontSize: '13px',
+                        color: '#94a3b8',
+                    },
+                },
+            },
+        },
     },
+    tooltip: { theme: 'dark' },
 });
 
-const productSeries = ref([44, 55, 13, 33, 22]);
+const productSeries = ref<number[]>([]);
 
-// Métodos
-const viewLoan = (id: string) => {
-    router.push(`/loans/${id}`);
+const updateCharts = (loans: Awaited<ReturnType<typeof fetchAllLoans>>) => {
+    const evolution = buildMonthlyLoansEvolution(loans);
+    const distribution = buildProductDistribution(loans);
+
+    loansSeries.value = [{ name: 'Empréstimos', data: evolution.data }];
+    loansChart.value = {
+        ...loansChart.value,
+        xaxis: {
+            ...loansChart.value.xaxis,
+            categories: evolution.categories,
+        },
+    };
+
+    productSeries.value = distribution.series;
+    productChart.value = {
+        ...productChart.value,
+        labels: distribution.labels,
+    };
+
+    hasChartData.value = loans.length > 0;
 };
 
-const viewParcel = (id: string) => {
-    router.push(`/parcels/${id}`);
-};
+const viewLoan = (id: string) => router.push(`/loans/view/${id}`);
+const viewParcel = (loanId: string) => router.push(`/loans/view/${loanId}`);
 
-const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR');
+const formatDate = (date: string) => new Date(date).toLocaleDateString('pt-BR');
+
+const formatAmount = (amount: number) => {
+    if (amount >= 1000) return `${(amount / 1000).toFixed(1)}k`;
+    return amount.toLocaleString('pt-BR');
 };
 
 const formatTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
-
-    if (diffInMinutes < 60) {
-        return `${diffInMinutes}m atrás`;
-    } else if (diffInMinutes < 1440) {
-        return `${Math.floor(diffInMinutes / 60)}h atrás`;
-    } else {
-        return `${Math.floor(diffInMinutes / 1440)}d atrás`;
-    }
+    const diffInMinutes = Math.floor((Date.now() - new Date(timestamp).getTime()) / 60000);
+    if (diffInMinutes < 60) return `${diffInMinutes}m atrás`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h atrás`;
+    return `${Math.floor(diffInMinutes / 1440)}d atrás`;
 };
 
-// Carregar dados
 const loadDashboardData = async () => {
     try {
         loading.value = true;
+        chartsLoading.value = true;
 
-        // Carregar estatísticas
-        await krefasyStore.fetchDashboardStats();
+        const allLoans = await fetchAllLoans(loansService);
 
-        // Carregar empréstimos pendentes
-        const pendingResponse = await krefasyStore.fetchLoans({ status: 'PENDING', limit: 5 });
-        pendingLoans.value = pendingResponse.loans;
+        await krefasyStore.fetchDashboardStats(allLoans);
 
-        // Carregar parcelas vencendo
-        const overdueResponse = await krefasyStore.fetchParcels({ overdueOnly: true, limit: 5 });
-        overdueParcels.value = overdueResponse.parcels;
+        pendingLoans.value = filterPendingLoans(allLoans, 5);
 
-        // Simular atividade recente
-        recentActivity.value = [
-            {
-                id: 1,
-                icon: IconUserPlus,
-                title: 'Novo cliente cadastrado',
-                description: 'João Silva foi cadastrado no sistema',
-                timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-            },
-            {
-                id: 2,
-                icon: IconCheckCircle,
-                title: 'Empréstimo aprovado',
-                description: 'Empréstimo de R$ 50.000 foi aprovado para Maria Santos',
-                timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-            },
-            {
-                id: 3,
-                icon: IconAlertCircle,
-                title: 'Parcela vencida',
-                description: 'Parcela de R$ 1.200 venceu para Pedro Costa',
-                timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-            },
-        ];
+        let overdueResult = { items: [] as DashboardInstallment[], totalCount: 0 };
+        try {
+            overdueResult = await fetchOverdueInstallments(loansService, allLoans, 20, 5);
+        } catch (overdueError) {
+            console.error('Erro ao buscar parcelas vencidas:', overdueError);
+        }
 
+        overdueParcels.value = overdueResult.items;
+        krefasyStore.setDashboardOverdueParcels(
+            overdueResult.totalCount > 0
+                ? overdueResult.totalCount
+                : krefasyStore.dashboardStats.overdueParcels
+        );
+
+        updateCharts(allLoans);
+
+        recentActivity.value = buildRecentActivity(
+            pendingLoans.value,
+            overdueParcels.value,
+            { pending: IconCheckCircle, overdue: IconAlertCircle }
+        );
     } catch (error) {
         console.error('Erro ao carregar dados do dashboard:', error);
+        hasChartData.value = false;
     } finally {
         loading.value = false;
+        chartsLoading.value = false;
     }
 };
 
-// Lifecycle
-onMounted(() => {
-    loadDashboardData();
-});
+onMounted(() => loadDashboardData());
 </script>
 
 <style scoped>
-.table-responsive {
+.btn-refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1.5px solid var(--krefasy-border);
+    border-radius: 10px;
+    background: var(--krefasy-surface);
+    color: var(--krefasy-text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-refresh:hover:not(:disabled) {
+    border-color: var(--krefasy-purple);
+    color: var(--krefasy-purple);
+    background: var(--krefasy-purple-light);
+}
+
+.btn-refresh:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.refresh-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.refresh-icon.spinning svg {
+    animation: spin 0.8s linear infinite;
+}
+
+/* ── KPI Cards ── */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+@media (min-width: 640px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 1280px) {
+    .kpi-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.kpi-card {
+    background: var(--krefasy-surface);
+    border: 1px solid var(--krefasy-border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+}
+
+.kpi-card.accent-purple::before { background: linear-gradient(90deg, var(--krefasy-purple), #a832aa); }
+.kpi-card.accent-navy::before { background: linear-gradient(90deg, var(--krefasy-navy), #1e2a5e); }
+.kpi-card.accent-gold::before { background: linear-gradient(90deg, #d97706, #f59e0b); }
+.kpi-card.accent-danger::before { background: linear-gradient(90deg, #dc2626, #ef4444); }
+
+.kpi-card:hover {
+    box-shadow: 0 8px 24px rgba(14, 17, 51, 0.06);
+    transform: translateY(-1px);
+}
+
+.kpi-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.kpi-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: grid;
+    place-content: center;
+}
+
+.kpi-icon :deep(svg) {
+    width: 22px;
+    height: 22px;
+}
+
+.accent-purple .kpi-icon { background: rgba(128, 31, 130, 0.1); color: var(--krefasy-purple); }
+.accent-navy .kpi-icon { background: rgba(14, 17, 51, 0.08); color: var(--krefasy-navy); }
+.accent-gold .kpi-icon { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+.accent-danger .kpi-icon { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+
+.kpi-trend {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 20px;
+}
+
+.trend-up { background: #ecfdf5; color: #059669; }
+.trend-down { background: #ecfdf5; color: #059669; }
+
+.kpi-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--krefasy-text-muted);
+    margin: 0 0 4px;
+}
+
+.kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--krefasy-text);
+    margin: 0;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.kpi-period {
+    font-size: 12px;
+    color: #94a3b8;
+    margin: 6px 0 0;
+}
+
+/* ── Panels ── */
+.charts-grid,
+.tables-grid {
+    display: grid;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+@media (min-width: 1280px) {
+    .charts-grid,
+    .tables-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.dash-panel {
+    background: var(--krefasy-surface);
+    border: 1px solid var(--krefasy-border);
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.panel-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--krefasy-text);
+    margin: 0 0 2px;
+}
+
+.panel-subtitle {
+    font-size: 13px;
+    color: var(--krefasy-text-muted);
+    margin: 0;
+}
+
+.panel-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--krefasy-purple);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: opacity 0.2s;
+}
+
+.panel-link:hover {
+    opacity: 0.75;
+    text-decoration: underline;
+}
+
+.panel-menu-btn {
+    display: grid;
+    place-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: var(--krefasy-surface-muted);
+    border-radius: 8px;
+    color: var(--krefasy-text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.panel-menu-btn:hover {
+    background: var(--krefasy-purple-light);
+    color: var(--krefasy-purple);
+}
+
+.panel-menu-btn :deep(svg) {
+    width: 18px;
+    height: 18px;
+}
+
+.chart-wrap {
+    margin: 0 -4px;
+}
+
+.chart-loader {
+    min-height: 325px;
+    display: grid;
+    place-content: center;
+    background: var(--krefasy-surface-muted);
+    border-radius: 12px;
+}
+
+.chart-loader-lg {
+    min-height: 400px;
+}
+
+.chart-loading-text {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--krefasy-text-muted);
+}
+
+.chart-empty {
+    min-height: 325px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--krefasy-surface-muted);
+    border-radius: 12px;
+    color: var(--krefasy-text-muted);
+    font-size: 14px;
+}
+
+.chart-empty-lg {
+    min-height: 400px;
+}
+
+/* ── Tables ── */
+.table-wrap {
     overflow-x: auto;
+    margin: 0 -8px;
 }
 
-.table-striped tbody tr:nth-child(even) {
-    background-color: rgba(0, 0, 0, 0.02);
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
 }
 
-:global(.dark) .table-striped tbody tr:nth-child(even) {
-    background-color: rgba(255, 255, 255, 0.02);
+thead th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--krefasy-text-muted);
+    border-bottom: 1px solid var(--krefasy-border);
+}
+
+tbody td {
+    padding: 14px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+tbody tr:last-child td {
+    border-bottom: none;
+}
+
+tbody tr {
+    transition: background 0.15s;
+}
+
+tbody tr:hover {
+    background: var(--krefasy-surface-muted);
+}
+
+.client-name {
+    font-weight: 600;
+    color: var(--krefasy-text);
+}
+
+.amount {
+    font-weight: 600;
+    color: var(--krefasy-navy);
+}
+
+.due-date {
+    color: #dc2626;
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.text-right {
+    text-align: right;
 }
 
 .badge {
     display: inline-block;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border-radius: 0.375rem;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 20px;
+    letter-spacing: 0.02em;
 }
 
-.badge-outline-warning {
-    color: #e2a03f;
-    border: 1px solid #e2a03f;
-    background-color: transparent;
+.badge-pending {
+    background: #fff7ed;
+    color: #c2410c;
 }
 
-.btn {
-    display: inline-flex;
+.btn-action {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--krefasy-purple);
+    color: white;
+    transition: all 0.2s;
+}
+
+.btn-action:hover {
+    background: #6a1a6c;
+    transform: translateY(-1px);
+}
+
+.btn-action-warning {
+    background: #d97706;
+}
+
+.btn-action-warning:hover {
+    background: #b45309;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-decoration: none;
+    padding: 40px 20px;
+    color: var(--krefasy-text-muted);
+    font-size: 14px;
 }
 
-.btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
+.empty-icon {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 12px;
+    opacity: 0.5;
 }
 
-.btn-primary {
-    background-color: #4361ee;
-    color: white;
+.empty-icon.success {
+    color: #059669;
+    opacity: 0.7;
 }
 
-.btn-primary:hover {
-    background-color: #3a56d4;
+/* ── Activity ── */
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
-.btn-warning {
-    background-color: #e2a03f;
-    color: white;
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 0;
+    position: relative;
 }
 
-.btn-warning:hover {
-    background-color: #d1902e;
+.activity-item + .activity-item {
+    border-top: 1px solid #f1f5f9;
+}
+
+.activity-track {
+    display: none;
+}
+
+.activity-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: grid;
+    place-content: center;
+    flex-shrink: 0;
+}
+
+.activity-icon :deep(svg) {
+    width: 18px;
+    height: 18px;
+}
+
+.activity-icon.success { background: #ecfdf5; color: #059669; }
+.activity-icon.purple { background: rgba(128, 31, 130, 0.1); color: var(--krefasy-purple); }
+.activity-icon.warning { background: #fff7ed; color: #d97706; }
+
+.activity-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--krefasy-text);
+    margin: 0 0 2px;
+}
+
+.activity-desc {
+    font-size: 13px;
+    color: var(--krefasy-text-muted);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.activity-time {
+    font-size: 12px;
+    color: #94a3b8;
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+
+/* ── Skeleton / Loading ── */
+.skeleton {
+    display: block;
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+}
+
+.skeleton-value {
+    width: 80px;
+    height: 32px;
+}
+
+.skeleton-row {
+    height: 48px;
+    margin-bottom: 8px;
+}
+
+.table-skeleton {
+    padding: 8px 0;
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 2.5px solid #e2e8f0;
+    border-top-color: var(--krefasy-purple);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ── Dark mode ── */
+:global(.dark) .kpi-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+:global(.dark) .accent-navy .kpi-icon {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+}
+
+:global(.dark) .amount {
+    color: #e2e8f0;
+}
+
+:global(.dark) tbody td {
+    border-bottom-color: #1e293b;
+}
+
+:global(.dark) tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+:global(.dark) .activity-item + .activity-item {
+    border-top-color: #1e293b;
+}
+
+:global(.dark) .trend-up,
+:global(.dark) .trend-down {
+    background: rgba(5, 150, 105, 0.15);
+}
+
+:global(.dark) .badge-pending {
+    background: rgba(194, 65, 12, 0.15);
+    color: #fb923c;
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+    .kpi-value {
+        font-size: 24px;
+    }
+
+    .activity-time {
+        display: none;
+    }
+
+    .dash-panel {
+        padding: 18px;
+    }
 }
 </style>

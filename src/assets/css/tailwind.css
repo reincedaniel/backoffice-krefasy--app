@@ -59,16 +59,16 @@
     }
 
     body {
-        @apply bg-[#fafafa] font-nunito;
+        @apply bg-[var(--krefasy-surface-muted)] font-nunito;
     }
 
     body.dark {
-        @apply bg-[#060818];
+        @apply bg-[var(--krefasy-surface-muted)];
     }
 
     /* Panel */
     .panel {
-        @apply relative rounded-md bg-white p-5 shadow dark:bg-[#0e1726];
+        @apply relative rounded-2xl border border-[var(--krefasy-border)] bg-[var(--krefasy-surface)] p-5 shadow-none dark:bg-[var(--krefasy-surface)];
     }
 
     /* Navbar */
@@ -100,12 +100,17 @@
     }
     .sidebar .nav-item > button.active,
     .sidebar .nav-item > a.active {
-        @apply bg-[#000]/[0.08] text-black dark:bg-[#181f32] dark:text-white-dark;
+        @apply bg-[var(--krefasy-purple-light)] text-[var(--krefasy-purple)] dark:text-[var(--krefasy-purple)];
     }
 
     .sidebar .nav-item > button.active > div > span,
     .sidebar .nav-item > a.active > div > span {
-        @apply dark:!text-white-dark;
+        @apply !text-[var(--krefasy-purple)] dark:!text-[var(--krefasy-purple)];
+    }
+
+    .sidebar .nav-item > button.active > div:first-child svg,
+    .sidebar .nav-item > a.active > div:first-child svg {
+        @apply !text-[var(--krefasy-purple)];
     }
 
     .sidebar ul.sub-menu li button,
@@ -281,7 +286,7 @@ hover:text-primary hover:before:!bg-primary ltr:before:mr-2 rtl:before:ml-2 dark
     }
 
     .btn-primary {
-        @apply border-primary bg-primary text-white shadow-primary/60;
+        @apply border-primary bg-primary text-white shadow-primary/30 hover:border-[var(--krefasy-purple-hover)] hover:bg-[var(--krefasy-purple-hover)];
     }
     .btn-outline-primary {
         @apply border-primary text-primary shadow-none hover:bg-primary hover:text-white;
@@ -365,7 +370,7 @@ hover:text-primary hover:before:!bg-primary ltr:before:mr-2 rtl:before:ml-2 dark
     .form-textarea,
     .form-select,
     .form-multiselect {
-        @apply w-full rounded-md border border-[#e0e6ed] bg-white px-4 py-2 text-sm font-semibold text-black !outline-none focus:border-primary focus:ring-transparent dark:border-[#17263c] dark:bg-[#121e32] dark:text-white-dark dark:focus:border-primary;
+        @apply w-full rounded-md border border-[var(--krefasy-border)] bg-[var(--krefasy-surface)] px-4 py-2 text-sm font-semibold text-[var(--krefasy-text)] !outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-[var(--krefasy-border)] dark:bg-[var(--krefasy-surface)] dark:text-white-dark dark:focus:border-primary dark:focus:ring-primary/20;
     }
 
     .form-input-lg,

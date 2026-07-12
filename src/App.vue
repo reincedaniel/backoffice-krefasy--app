@@ -20,7 +20,7 @@
     const krefasyStore = useKrefasyStore();
 
     // meta
-    useMeta({ title: 'Sales Admin' });
+    useMeta({ title: 'Krefasy Backoffice' });
 
     const mainLayout = computed(() => {
         return store.mainLayout === 'auth' ? AuthLayout : AppLayout;

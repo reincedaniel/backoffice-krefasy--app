@@ -3,8 +3,16 @@ import { ref, computed } from 'vue';
 import { authService, UserData } from '@/services/auth.service';
 import { customerService, Customer } from '@/services/customers.service';
 import { loansService, Loan, LoanListResponse, LoanStats } from '@/services/loans.service';
+import { buildDashboardStatsFromLoans, type DashboardLoan } from '@/utils/dashboard-charts.utils';
 import { parcelsService, Parcel, ParcelListResponse, ParcelStats } from '@/services/parcels.service';
-import { messagesService, Conversation, Message, ConversationListResponse } from '@/services/messages.service';
+import {
+    messagesService,
+    Conversation,
+    Message,
+    ConversationListResponse,
+    CreateConversationRequest,
+    ConversationStats,
+} from '@/services/messages.service';
 
 export const useKrefasyStore = defineStore('krefasy', () => {
     // Estado da autenticação
@@ -46,7 +54,11 @@ export const useKrefasyStore = defineStore('krefasy', () => {
     const conversationsLimit = ref(20);
     const selectedConversation = ref<Conversation | null>(null);
     const currentMessages = ref<Message[]>([]);
+    const messagesLoading = ref(false);
+    const conversationStats = ref<ConversationStats | null>(null);
     const unreadCount = ref(0);
+    const unreadConversations = ref<Conversation[]>([]);
+    const pendingChatConversationId = ref<string | null>(null);
 
     // Estado das notificações -
     const notifications = ref<any[]>([]);
@@ -202,7 +214,15 @@ export const useKrefasyStore = defineStore('krefasy', () => {
 
     const fetchLoanStats = async (filters?: any) => {
         try {
-            const stats = await loansService.getLoanStats(filters);
+            const allLoans = await loansService.getAllLoans() as DashboardLoan[];
+            const derived = buildDashboardStatsFromLoans(allLoans);
+            const stats: LoanStats = {
+                ...derived,
+                completedLoans: 0,
+                totalOutstanding: 0,
+                averageInterestRate: 0,
+                averageTerm: 0,
+            };
             loanStats.value = stats;
             return stats;
         } catch (error) {
@@ -319,11 +339,14 @@ export const useKrefasyStore = defineStore('krefasy', () => {
 
     const fetchMessages = async (conversationId: string) => {
         try {
+            messagesLoading.value = true;
             const response = await messagesService.getMessages(conversationId);
             currentMessages.value = response.messages;
             return response;
         } catch (error) {
             throw error;
+        } finally {
+            messagesLoading.value = false;
         }
     };
 
@@ -337,28 +360,121 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         }
     };
 
-    // Ações do dashboard
-    const fetchDashboardStats = async () => {
+    const createConversation = async (data: CreateConversationRequest) => {
         try {
-            // Buscar estatísticas de todas as entidades
-            const [loanStatsData, parcelStatsData] = await Promise.all([
-                loansService.getLoanStats(),
-                parcelsService.getParcelStats()
-            ]);
+            const conversation = await messagesService.createConversation(data);
+            conversations.value.unshift(conversation);
+            conversationsTotal.value += 1;
+            return conversation;
+        } catch (error) {
+            throw error;
+        }
+    };
 
-            dashboardStats.value = {
-                totalClients: clientsTotal.value,
-                totalLoans: loanStatsData.totalLoans,
-                activeLoans: loanStatsData.activeLoans,
-                totalAmount: loanStatsData.totalAmount,
-                totalRepaid: loanStatsData.totalRepaid,
-                defaultRate: loanStatsData.defaultedLoans / loanStatsData.totalLoans * 100,
-                pendingLoans: loanStatsData.pendingLoans,
-                overdueParcels: parcelStatsData.overdueParcels
-            };
+    const markConversationAsRead = async (conversationId: string) => {
+        try {
+            await messagesService.markConversationAsRead(conversationId);
+            const conversation = conversations.value.find((c) => c.id === conversationId);
+            if (conversation) {
+                conversation.unreadCount = 0;
+            }
+            if (selectedConversation.value?.id === conversationId) {
+                selectedConversation.value.unreadCount = 0;
+            }
+            await fetchUnreadChatNotifications();
+        } catch (error) {
+            throw error;
+        }
+    };
+
+    const fetchUnreadChatNotifications = async () => {
+        try {
+            const response = await messagesService.getConversations({
+                page: 1,
+                limit: 50,
+                unreadOnly: true,
+            });
+            const unread = response.conversations.filter((c) => c.unreadCount > 0);
+            unreadConversations.value = unread;
+            unreadCount.value = unread.reduce((sum, c) => sum + c.unreadCount, 0);
+            return unread;
+        } catch (error) {
+            console.error('Erro ao buscar notificações de chat:', error);
+            return [];
+        }
+    };
+
+    const setPendingChatConversationId = (conversationId: string | null) => {
+        pendingChatConversationId.value = conversationId;
+    };
+
+    const clearPendingChatConversationId = () => {
+        pendingChatConversationId.value = null;
+    };
+
+    const updateConversationStatus = async (conversationId: string, status: string) => {
+        try {
+            const conversation = await messagesService.updateConversation(conversationId, { status });
+            const index = conversations.value.findIndex((c) => c.id === conversationId);
+            if (index >= 0) {
+                conversations.value[index] = conversation;
+            }
+            if (selectedConversation.value?.id === conversationId) {
+                selectedConversation.value = conversation;
+            }
+            return conversation;
+        } catch (error) {
+            throw error;
+        }
+    };
+
+    const fetchConversationStats = async () => {
+        try {
+            const stats = await messagesService.getConversationStats();
+            conversationStats.value = stats;
+            return stats;
+        } catch (error) {
+            throw error;
+        }
+    };
+
+    // Ações do dashboard
+    const fetchDashboardStats = async (loans?: DashboardLoan[]) => {
+        try {
+            const customersResponse = await customerService.getCustomers();
+
+            const totalClients = customersResponse.succeeded && customersResponse.data
+                ? customersResponse.data.length
+                : clientsTotal.value;
+
+            clientsTotal.value = totalClients;
+
+            if (loans) {
+                const loanStatsData = buildDashboardStatsFromLoans(loans);
+
+                dashboardStats.value = {
+                    totalClients,
+                    totalLoans: loanStatsData.totalLoans,
+                    activeLoans: loanStatsData.activeLoans,
+                    totalAmount: loanStatsData.totalAmount,
+                    totalRepaid: loanStatsData.totalRepaid,
+                    defaultRate: loanStatsData.defaultRate,
+                    pendingLoans: loanStatsData.pendingLoans,
+                    overdueParcels: loanStatsData.defaultedLoans,
+                };
+            } else {
+                dashboardStats.value = {
+                    ...dashboardStats.value,
+                    totalClients,
+                };
+            }
         } catch (error) {
             console.error('Erro ao buscar estatísticas do dashboard:', error);
         }
+    };
+
+    const setDashboardOverdueParcels = (count: number) => {
+        dashboardStats.value.overdueParcels = count;
     };
 
     // Reset do store
@@ -374,6 +490,10 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         selectedConversation.value = null;
         loanStats.value = null;
         parcelStats.value = null;
+        conversationStats.value = null;
+        unreadCount.value = 0;
+        unreadConversations.value = [];
+        pendingChatConversationId.value = null;
         notifications.value = [];
         notificationsCount.value = 0;
     };
@@ -383,6 +503,7 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         await checkAuth();
         if (isAuthenticated.value) {
             await fetchDashboardStats();
+            await fetchUnreadChatNotifications();
         }
     };
 
@@ -418,7 +539,11 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         conversationsLimit,
         selectedConversation,
         currentMessages,
+        messagesLoading,
+        conversationStats,
         unreadCount,
+        unreadConversations,
+        pendingChatConversationId,
         notifications,
         notificationsCount,
         dashboardStats,
@@ -449,7 +574,15 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         fetchConversationById,
         fetchMessages,
         sendMessage,
+        createConversation,
+        markConversationAsRead,
+        updateConversationStatus,
+        fetchConversationStats,
+        fetchUnreadChatNotifications,
+        setPendingChatConversationId,
+        clearPendingChatConversationId,
         fetchDashboardStats,
+        setDashboardOverdueParcels,
         resetStore,
         initializeStore
     };

@@ -1,16 +1,16 @@
 <template>
     <div>
-        <!-- Breadcrumb -->
-        <ul class="flex space-x-2 rtl:space-x-reverse">
-            <li>
-                <router-link to="/currencies" class="text-primary hover:underline">Gestão de Moedas</router-link>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>Detalhes da Moeda</span>
-            </li>
-        </ul>
+        <PageHeader
+            title="Detalhes da Moeda"
+            subtitle="Visualize e edite as informações da moeda"
+            :breadcrumbs="[
+                { label: 'Dashboard', to: '/dashboard' },
+                { label: 'Moedas', to: '/currencies' },
+                { label: 'Detalhes' },
+            ]"
+        />
 
-        <div class="pt-5">
+        <div>
             <div v-if="loading" class="panel">
                 <div class="flex items-center justify-center py-12">
                     <div class="inline-flex items-center">
@@ -198,6 +198,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useMeta } from '@/composables/use-meta';
 import { currencyService, type Currency } from '@/services/currencies.service';
+import PageHeader from '@/components/layout/PageHeader.vue';
 import CurrencyModal from './CurrencyModal.vue';
 import Swal from 'sweetalert2';
 

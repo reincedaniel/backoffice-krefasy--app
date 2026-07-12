@@ -1,31 +1,21 @@
 <template>
     <div>
-        <!-- Breadcrumb -->
-        <ul class="flex space-x-2 rtl:space-x-reverse">
-            <li>
-                <router-link to="/loan-products" class="text-primary hover:underline">Produtos de Empréstimo</router-link>
-            </li>
-            <li class="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                <span>Lista de Produtos</span>
-            </li>
-        </ul>
+        <PageHeader
+            title="Produtos de Empréstimo"
+            subtitle="Gerencie os produtos de crédito disponíveis"
+            :breadcrumbs="[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Produtos de Empréstimo' }]"
+        >
+            <template #actions>
+                <button @click="openCreateModal" class="btn btn-primary" :disabled="loading">
+                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Adicionar Produto
+                </button>
+            </template>
+        </PageHeader>
 
-        <div class="pt-5">
-            <div class="panel">
-                <div class="flex items-center justify-between mb-5">
-                    <h5 class="font-semibold text-lg dark:text-white-light">Lista de Produtos de Empréstimo</h5>
-                    <button
-                        @click="openCreateModal"
-                        class="btn btn-primary"
-                        :disabled="loading"
-                    >
-                        <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                        </svg>
-                        Adicionar Produto
-                    </button>
-                </div>
-
+        <div class="panel">
                 <!-- Filtros -->
                 <div class="mb-5 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
@@ -201,7 +191,6 @@
                     </div>
                 </div>
             </div>
-        </div>
 
         <!-- Modal de Criação/Edição -->
         <LoanProductModal
@@ -219,6 +208,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMeta } from '@/composables/use-meta';
 import { loanProductService, type LoanProduct, type LoanProductFilters } from '@/services/loan-products.service';
+import PageHeader from '@/components/layout/PageHeader.vue';
 import LoanProductModal from './LoanProductModal.vue';
 import Swal from 'sweetalert2';
 

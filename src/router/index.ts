@@ -2,11 +2,9 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 import { useAppStore } from '@/stores/index';
 import appSetting from '@/app-setting';
 
-import HomeView from '../views/index.vue';
-
 const routes: RouteRecordRaw[] = [
     // dashboard
-    { path: '/', name: 'home', component: HomeView },
+    { path: '/', redirect: '/dashboard' },
     {
         path: '/analytics',
         name: 'analytics',
@@ -34,27 +32,26 @@ const routes: RouteRecordRaw[] = [
         path: '/dashboard',
         name: 'krefasy-dashboard',
         component: () => import(/* webpackChunkName: "krefasy-dashboard" */ '../views/dashboard/krefasy-dashboard.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Dashboard' }
     },
-    // Clientes (nova API)
     {
         path: '/customers',
         name: 'customers',
         component: () => import(/* webpackChunkName: "customers" */ '../views/customers/index.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Clientes' }
     },
     {
         path: '/customers/:id',
         name: 'customer-detail',
         component: () => import(/* webpackChunkName: "customer-detail" */ '../views/customers/detail.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Detalhe do Cliente' }
     },
     // Users (gestão de utilizadores)
     {
         path: '/users',
         name: 'users',
         component: () => import(/* webpackChunkName: "users" */ '../views/users/index.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Utilizadores' }
     },
     // Clients (legacy - manter por compatibilidade)
     {
@@ -73,104 +70,110 @@ const routes: RouteRecordRaw[] = [
         path: '/loans',
         name: 'krefasy-loans',
         component: () => import(/* webpackChunkName: "krefasy-loans" */ '../views/loans/krefasy-loans.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Empréstimos' }
     },
     {
         path: '/loans/add',
         name: 'krefasy-loans-add',
         component: () => import(/* webpackChunkName: "krefasy-loans-add" */ '../views/loans/krefasy-loans-add.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Novo Empréstimo' }
     },
     {
         path: '/loans/edit/:id',
         name: 'krefasy-loans-edit',
         component: () => import(/* webpackChunkName: "krefasy-loans-edit" */ '../views/loans/krefasy-loans-edit.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Editar Empréstimo' }
     },
     {
         path: '/loans/view/:id',
         name: 'krefasy-loans-view',
         component: () => import(/* webpackChunkName: "krefasy-loan-detail" */ '../views/loans/krefasy-loan-detail.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Detalhe do Empréstimo' }
     },
     {
         path: '/loans/pending',
         name: 'krefasy-loans-pending',
         component: () => import(/* webpackChunkName: "krefasy-loans-pending" */ '../views/loans/krefasy-loans-pending.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Empréstimos Pendentes' }
     },
     {
         path: '/parcels',
         name: 'krefasy-parcels',
         component: () => import(/* webpackChunkName: "krefasy-parcels" */ '../views/parcels/krefasy-parcels.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Parcelas' }
     },
     {
         path: '/parcels/overdue',
         name: 'krefasy-parcels-overdue',
         component: () => import(/* webpackChunkName: "krefasy-parcels-overdue" */ '../views/parcels/krefasy-parcels-overdue.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Parcelas Vencidas' }
     },
     {
         path: '/parcels/:id',
         name: 'krefasy-parcel-detail',
         component: () => import(/* webpackChunkName: "krefasy-parcel-detail" */ '../views/parcels/krefasy-parcel-detail.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Detalhe da Parcela' }
     },
     {
         path: '/chat',
         name: 'krefasy-chat',
         component: () => import(/* webpackChunkName: "krefasy-chat" */ '../views/chat/krefasy-chat.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Chat' }
     },
     {
         path: '/reports',
         name: 'krefasy-reports',
         component: () => import(/* webpackChunkName: "krefasy-reports" */ '../views/reports/krefasy-reports.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Relatórios' }
     },
     {
         path: '/settings',
         name: 'krefasy-settings',
         component: () => import(/* webpackChunkName: "krefasy-settings" */ '../views/settings/krefasy-settings.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Configurações' }
     },
     {
         path: '/currencies',
         name: 'currencies',
         component: () => import(/* webpackChunkName: "currencies" */ '../views/currencies/index.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Moedas' }
     },
         {
             path: '/currencies/:id',
             name: 'currency-detail',
             component: () => import(/* webpackChunkName: "currency-detail" */ '../views/currencies/detail.vue'),
-            meta: { requiresAuth: true, layout: 'app' }
+            meta: { requiresAuth: true, layout: 'app', title: 'Detalhe da Moeda' }
         },
         // Configurações de Empréstimos
         {
             path: '/interest-periods',
             name: 'interest-periods',
             component: () => import(/* webpackChunkName: "interest-periods" */ '../views/interest-periods/index.vue'),
-            meta: { requiresAuth: true, layout: 'app' }
+            meta: { requiresAuth: true, layout: 'app', title: 'Períodos de Juros' }
         },
         {
             path: '/loan-status',
             name: 'loan-status',
             component: () => import(/* webpackChunkName: "loan-status" */ '../views/loan-status/index.vue'),
-            meta: { requiresAuth: true, layout: 'app' }
+            meta: { requiresAuth: true, layout: 'app', title: 'Status de Empréstimos' }
+        },
+        {
+            path: '/payment-method-types',
+            name: 'payment-method-types',
+            component: () => import(/* webpackChunkName: "payment-method-types" */ '../views/payment-method-types/index.vue'),
+            meta: { requiresAuth: true, layout: 'app', title: 'Métodos de Pagamento' }
         },
         {
             path: '/countries',
             name: 'countries',
             component: () => import(/* webpackChunkName: "countries" */ '../views/countries/index.vue'),
-            meta: { requiresAuth: true, layout: 'app' }
+            meta: { requiresAuth: true, layout: 'app', title: 'Países' }
         },
         {
             path: '/loan-interest-rates',
             name: 'loan-interest-rates',
             component: () => import(/* webpackChunkName: "loan-interest-rates" */ '../views/loan-interest-rates/index.vue'),
-            meta: { requiresAuth: true, layout: 'app' }
+            meta: { requiresAuth: true, layout: 'app', title: 'Taxas de Juros' }
         },
         {
             path: '/loan-installment-options',
@@ -181,13 +184,13 @@ const routes: RouteRecordRaw[] = [
         path: '/loan-products',
         name: 'loan-products',
         component: () => import(/* webpackChunkName: "loan-products" */ '../views/loan-products/index.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Produtos de Empréstimo' }
     },
     {
         path: '/loan-products/:id',
         name: 'loan-product-detail',
         component: () => import(/* webpackChunkName: "loan-product-detail" */ '../views/loan-products/detail.vue'),
-        meta: { requiresAuth: true, layout: 'app' }
+        meta: { requiresAuth: true, layout: 'app', title: 'Detalhe do Produto' }
     },
 
     // apps
