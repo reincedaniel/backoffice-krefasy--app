@@ -294,6 +294,19 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         }
     };
 
+    const changeLoanStatus = async (id: string, data: { loanStatusId: string; rejectionReason?: string; notes?: string }) => {
+        try {
+            const loan = await loansService.changeLoanStatus(id, data);
+            const index = loans.value.findIndex(l => l.id === id);
+            if (index !== -1) {
+                loans.value[index] = loan;
+            }
+            return loan;
+        } catch (error) {
+            throw error;
+        }
+    };
+
     const approveManual = async (id: string, stripeAccountId: string) => {
         try {
             const loan = await loansService.approveManual(id, stripeAccountId);
@@ -790,6 +803,7 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         fetchLoanById,
         fetchLoanStats,
         approveLoan,
+        changeLoanStatus,
         approveManual,
         fetchLoanStatuses,
         fetchParcels,

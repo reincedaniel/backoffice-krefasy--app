@@ -78,6 +78,15 @@ export interface LoanApprovalRequest {
     modifiedTerm?: number;
 }
 
+export interface LoanStatusChangeRequest {
+    loanStatusId: string;
+    rejectionReason?: string;
+    notes?: string;
+}
+
+/** Status "Rejeitado" na API */
+export const REJECTED_STATUS_ID = 'a0000000-0000-0000-0000-000000000004';
+
 export interface LoanListResponse {
     loans: Loan[];
     total: number;
@@ -188,6 +197,15 @@ export class LoansService {
         const response = await apiService.post<Loan>(`/loans/${id}/approve`, approvalData);
         if (!response.data) {
             throw new Error('Erro ao aprovar empréstimo');
+        }
+        return normalizeApiObject<Loan>(response.data);
+    }
+
+    // Alterar status do empréstimo (ex.: rejeitar)
+    async changeLoanStatus(id: string, data: LoanStatusChangeRequest): Promise<Loan> {
+        const response = await apiService.put<Loan>(`/loans/${id}/status`, data);
+        if (!response.data) {
+            throw new Error('Erro ao alterar status do empréstimo');
         }
         return normalizeApiObject<Loan>(response.data);
     }

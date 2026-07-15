@@ -1,5 +1,6 @@
 import Swal from 'sweetalert2';
 import { useKrefasyStore } from '@/stores/index';
+import { REJECTED_STATUS_ID } from '@/services/loans.service';
 import {
     buildPaymentMethodHtml,
     type CustomerPaymentMethod,
@@ -221,10 +222,10 @@ export function useLoanDecisionDialogs() {
 
     const executeReject = async (loan: LoanDecision, reason: string): Promise<boolean> => {
         try {
-            await store.approveLoan(loan.id, {
-                approved: false,
+            await store.changeLoanStatus(loan.id, {
+                loanStatusId: REJECTED_STATUS_ID,
                 rejectionReason: reason,
-                modifiedAmount: loan.requestedAmount ?? loan.amount,
+                notes: '',
             });
 
             await Swal.fire({
