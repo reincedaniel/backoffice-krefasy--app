@@ -467,8 +467,6 @@ interface ExtendedLoan extends Loan {
     interestPeriodName?: string;
     loanStatusId?: string;
     loanStatusName?: string;
-    customerId?: string;
-    managerId?: string | null;
     managerName?: string;
     requestedAmount?: number;
     approvedAmount?: number;

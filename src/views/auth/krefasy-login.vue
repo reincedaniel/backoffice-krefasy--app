@@ -32,7 +32,7 @@
                     </li>
                     <li>
                         <span class="feature-dot"></span>
-                        Acesso restrito a administradores
+                        Acesso para administradores e partners
                     </li>
                 </ul>
             </div>
@@ -118,7 +118,7 @@
                 </form>
 
                 <footer class="auth-footer">
-                    <p class="footer-text">Apenas administradores podem acessar o backoffice</p>
+                    <p class="footer-text">Acesso reservado a administradores e partners</p>
                     <p class="footer-version">v1.0.0</p>
                 </footer>
             </div>

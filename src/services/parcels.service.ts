@@ -96,11 +96,58 @@ export interface ParcelRenegotiationRequest {
 export class ParcelsService {
     // Listar parcelas com paginação e filtros
     async getParcels(params: PaginationParams & ParcelFilters): Promise<ParcelListResponse> {
-        const response = await apiService.get<ParcelListResponse>('/parcels', params);
+        const response = await apiService.get<any>('/parcels', params);
         if (!response.data) {
             throw new Error('Dados não encontrados');
         }
-        return response.data;
+
+        const raw = response.data;
+        if (raw.parcels) {
+            return raw as ParcelListResponse;
+        }
+
+        if (raw.data && Array.isArray(raw.data)) {
+            const limit = raw.limit || params.limit || 100;
+            const total = raw.total || raw.data.length;
+            return {
+                parcels: raw.data,
+                total,
+                page: raw.currentPage || raw.page || params.page || 1,
+                limit,
+                totalPages: raw.pages || raw.totalPages || Math.max(1, Math.ceil(total / limit)),
+            };
+        }
+
+        if (Array.isArray(raw)) {
+            return {
+                parcels: raw,
+                total: raw.length,
+                page: params.page || 1,
+                limit: params.limit || raw.length,
+                totalPages: 1,
+            };
+        }
+
+        return raw as ParcelListResponse;
+    }
+
+    async getAllParcelsPage(page: number, limit = 100): Promise<ParcelListResponse> {
+        return this.getParcels({ page, limit });
+    }
+
+    async getAllParcels(limitPerPage = 100): Promise<Parcel[]> {
+        const allParcels: Parcel[] = [];
+        let page = 1;
+        let totalPages = 1;
+
+        do {
+            const response = await this.getAllParcelsPage(page, limitPerPage);
+            allParcels.push(...response.parcels);
+            totalPages = response.totalPages || 1;
+            page += 1;
+        } while (page <= totalPages);
+
+        return allParcels;
     }
 
     // Obter parcela por ID

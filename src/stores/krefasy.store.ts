@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { authService, UserData } from '@/services/auth.service';
+import { canAccessBackoffice } from '@/utils/auth.utils';
+import { getLoggedUserId, getPartnerRoleLabel } from '@/utils/partner-scope.utils';
 import { customerService, Customer } from '@/services/customers.service';
 import { loansService, Loan, LoanListResponse, LoanStats } from '@/services/loans.service';
 import { buildDashboardStatsFromLoans, type DashboardLoan } from '@/utils/dashboard-charts.utils';
@@ -12,7 +14,29 @@ import {
     ConversationListResponse,
     CreateConversationRequest,
     ConversationStats,
+    CreateMessageRequest,
 } from '@/services/messages.service';
+import {
+    appendCachedMessage,
+    buildFiltersKey,
+    canUseConversationsForUnread,
+    dedupeRequest,
+    deriveUnreadFromConversations,
+    getCachedConversations,
+    getCachedMessages,
+    getCachedStats,
+    invalidateConversationsCache,
+    isFresh,
+    MESSAGES_TTL_MS,
+    scheduleUnreadRefresh,
+    setCachedConversations,
+    setCachedMessages,
+    setCachedStats,
+    getCachedClients,
+    setCachedClients,
+    clearChatCache,
+    touchMessagesCache,
+} from '@/utils/chat-cache.utils';
 
 export const useKrefasyStore = defineStore('krefasy', () => {
     // Estado da autenticação
@@ -59,6 +83,12 @@ export const useKrefasyStore = defineStore('krefasy', () => {
     const unreadCount = ref(0);
     const unreadConversations = ref<Conversation[]>([]);
     const pendingChatConversationId = ref<string | null>(null);
+    const pendingChatDraftMessage = ref<string | null>(null);
+    const activeConversationId = ref<string | null>(null);
+    const messagesRefreshing = ref(false);
+    const conversationsRefreshing = ref(false);
+    const isChatPageActive = ref(false);
+    const conversationsInitialLoad = ref(true);
 
     // Estado das notificações -
     const notifications = ref<any[]>([]);
@@ -80,6 +110,10 @@ export const useKrefasyStore = defineStore('krefasy', () => {
     const hasRole = computed(() => (role: string) => currentUser.value?.roles.includes(role) || false);
     const hasPermission = computed(() => (permission: string) => currentUser.value?.permissions.includes(permission) || false);
     const isAdmin = computed(() => hasRole.value('Admin'));
+    const isPartner = computed(() => hasRole.value('Partner'));
+    const hasBackofficeAccess = computed(() => canAccessBackoffice(currentUser.value?.roles));
+    const loggedUserId = computed(() => getLoggedUserId());
+    const primaryRoleLabel = computed(() => getPartnerRoleLabel(currentUser.value?.roles));
 
     // Ações de autenticação
     const login = async (email: string, password: string) => {
@@ -104,22 +138,39 @@ export const useKrefasyStore = defineStore('krefasy', () => {
     };
 
     const checkAuth = async () => {
-        if (authService.isAuthenticated()) {
+        if (authService.isAuthenticated() && authService.canAccessBackoffice()) {
             currentUser.value = authService.getCurrentUser();
             isAuthenticated.value = true;
             return true;
+        }
+        if (authService.isAuthenticated()) {
+            authService.logout();
         }
         return false;
     };
 
     // Ações dos customers
-    const fetchClients = async (filters?: any) => {
+    const fetchClients = async (options?: { force?: boolean }) => {
+        const cached = !options?.force ? getCachedClients<Customer>() : null;
+        if (cached && cached.length > 0) {
+            clients.value = cached;
+            clientsTotal.value = cached.length;
+            return {
+                clients: cached,
+                total: cached.length,
+                page: 1,
+                limit: cached.length,
+                totalPages: 1,
+            };
+        }
+
         try {
             clientsLoading.value = true;
             const response = await customerService.getCustomers();
             if (response.succeeded && response.data) {
                 clients.value = response.data;
                 clientsTotal.value = response.data.length;
+                setCachedClients(response.data);
                 return {
                     clients: response.data,
                     total: response.data.length,
@@ -308,52 +359,165 @@ export const useKrefasyStore = defineStore('krefasy', () => {
     };
 
     // Ações das mensagens/conversas
-    const fetchConversations = async (filters?: any) => {
+    const syncUnreadFromList = () => {
+        const { unread, count } = deriveUnreadFromConversations(conversations.value);
+        unreadConversations.value = unread;
+        unreadCount.value = count;
+    };
+
+    const setActiveConversation = (conversation: Conversation | null) => {
+        selectedConversation.value = conversation;
+        activeConversationId.value = conversation?.id ?? null;
+        if (conversation) {
+            const cached = getCachedMessages(conversation.id);
+            if (cached) {
+                currentMessages.value = cached.messages;
+            }
+        } else {
+            currentMessages.value = [];
+        }
+    };
+
+    const bumpConversationPreview = (conversationId: string, _content: string, at?: string) => {
+        const conversation = conversations.value.find((c) => c.id === conversationId);
+        if (conversation) {
+            conversation.lastMessageAt = at || new Date().toISOString();
+        }
+        if (selectedConversation.value?.id === conversationId) {
+            selectedConversation.value.lastMessageAt = at || new Date().toISOString();
+        }
+        invalidateConversationsCache();
+    };
+
+    const fetchConversations = async (
+        filters?: Record<string, unknown>,
+        options?: { force?: boolean; silent?: boolean }
+    ) => {
+        const filtersKey = buildFiltersKey(filters);
+        const cached = !options?.force ? getCachedConversations(filtersKey) : null;
+
+        if (cached) {
+            conversations.value = cached.conversations;
+            conversationsTotal.value = cached.total;
+            syncUnreadFromList();
+            conversationsInitialLoad.value = false;
+            return {
+                conversations: cached.conversations,
+                total: cached.total,
+                page: conversationsPage.value,
+                limit: conversationsLimit.value,
+                totalPages: 1,
+            } as ConversationListResponse;
+        }
+
+        const showLoading = !options?.silent && conversationsInitialLoad.value;
+        const showRefresh = !options?.silent && options?.force && !conversationsInitialLoad.value;
         try {
-            conversationsLoading.value = true;
+            if (showLoading) conversationsLoading.value = true;
+            if (showRefresh) conversationsRefreshing.value = true;
+
             const params = {
                 page: conversationsPage.value,
                 limit: conversationsLimit.value,
-                ...filters
+                ...filters,
             };
-            const response = await messagesService.getConversations(params);
+
+            const response = await dedupeRequest(`conversations:${filtersKey}`, () =>
+                messagesService.getConversations(params)
+            );
+
             conversations.value = response.conversations;
             conversationsTotal.value = response.total;
+            setCachedConversations(filtersKey, response.conversations, response.total);
+            syncUnreadFromList();
+            conversationsInitialLoad.value = false;
             return response;
         } catch (error) {
             throw error;
         } finally {
-            conversationsLoading.value = false;
+            if (showLoading) conversationsLoading.value = false;
+            if (showRefresh) conversationsRefreshing.value = false;
         }
     };
 
-    const fetchConversationById = async (id: string) => {
+    const fetchConversationById = async (id: string, options?: { force?: boolean }) => {
+        const fromList = conversations.value.find((c) => c.id === id);
+        if (fromList && !options?.force) {
+            setActiveConversation(fromList);
+            return fromList;
+        }
+
         try {
-            const conversation = await messagesService.getConversationById(id);
-            selectedConversation.value = conversation;
+            const conversation = await dedupeRequest(`conversation:${id}`, () =>
+                messagesService.getConversationById(id)
+            );
+            setActiveConversation(conversation);
+            const index = conversations.value.findIndex((c) => c.id === id);
+            if (index >= 0) {
+                conversations.value[index] = conversation;
+            }
             return conversation;
         } catch (error) {
             throw error;
         }
     };
 
-    const fetchMessages = async (conversationId: string) => {
+    const fetchMessages = async (
+        conversationId: string,
+        options?: { force?: boolean; silent?: boolean }
+    ) => {
+        activeConversationId.value = conversationId;
+        const cached = getCachedMessages(conversationId);
+        const hasCache = cached && cached.messages.length >= 0;
+        const cacheFresh = hasCache && isFresh(cached!.fetchedAt, MESSAGES_TTL_MS);
+
+        if (hasCache && activeConversationId.value === conversationId) {
+            currentMessages.value = cached!.messages;
+        }
+
+        if (cacheFresh && !options?.force) {
+            messagesLoading.value = false;
+            void fetchMessages(conversationId, { force: true, silent: true });
+            return { messages: cached!.messages, total: cached!.messages.length, page: 1, limit: cached!.messages.length, totalPages: 1 };
+        }
+
+        const showOverlay = !options?.silent && !hasCache;
         try {
-            messagesLoading.value = true;
-            const response = await messagesService.getMessages(conversationId);
-            currentMessages.value = response.messages;
+            if (showOverlay) {
+                messagesLoading.value = true;
+            } else if (options?.silent || hasCache) {
+                messagesRefreshing.value = true;
+            }
+
+            const response = await dedupeRequest(`messages:${conversationId}`, () =>
+                messagesService.getMessages(conversationId)
+            );
+
+            setCachedMessages(conversationId, response.messages);
+            if (activeConversationId.value === conversationId) {
+                currentMessages.value = response.messages;
+            }
             return response;
         } catch (error) {
             throw error;
         } finally {
-            messagesLoading.value = false;
+            if (showOverlay) messagesLoading.value = false;
+            if (options?.silent || hasCache) messagesRefreshing.value = false;
         }
     };
 
-    const sendMessage = async (messageData: any) => {
+    const sendMessage = async (messageData: CreateMessageRequest) => {
         try {
             const message = await messagesService.sendMessage(messageData);
-            currentMessages.value.push(message);
+            const messages = appendCachedMessage(messageData.conversationId, message);
+            if (activeConversationId.value === messageData.conversationId) {
+                currentMessages.value = messages;
+            }
+            bumpConversationPreview(
+                messageData.conversationId,
+                message.content || messageData.content,
+                message.createdAt
+            );
             return message;
         } catch (error) {
             throw error;
@@ -365,6 +529,8 @@ export const useKrefasyStore = defineStore('krefasy', () => {
             const conversation = await messagesService.createConversation(data);
             conversations.value.unshift(conversation);
             conversationsTotal.value += 1;
+            invalidateConversationsCache();
+            syncUnreadFromList();
             return conversation;
         } catch (error) {
             throw error;
@@ -372,28 +538,46 @@ export const useKrefasyStore = defineStore('krefasy', () => {
     };
 
     const markConversationAsRead = async (conversationId: string) => {
+        const conversation = conversations.value.find((c) => c.id === conversationId);
+        const previousUnread = conversation?.unreadCount ?? 0;
+
+        if (conversation) conversation.unreadCount = 0;
+        if (selectedConversation.value?.id === conversationId) {
+            selectedConversation.value.unreadCount = 0;
+        }
+        syncUnreadFromList();
+
         try {
             await messagesService.markConversationAsRead(conversationId);
-            const conversation = conversations.value.find((c) => c.id === conversationId);
-            if (conversation) {
-                conversation.unreadCount = 0;
+            if (!canUseConversationsForUnread()) {
+                scheduleUnreadRefresh(() => {
+                    void fetchUnreadChatNotifications({ force: true });
+                });
             }
-            if (selectedConversation.value?.id === conversationId) {
-                selectedConversation.value.unreadCount = 0;
-            }
-            await fetchUnreadChatNotifications();
         } catch (error) {
+            if (conversation) conversation.unreadCount = previousUnread;
+            if (selectedConversation.value?.id === conversationId) {
+                selectedConversation.value.unreadCount = previousUnread;
+            }
+            syncUnreadFromList();
             throw error;
         }
     };
 
-    const fetchUnreadChatNotifications = async () => {
+    const fetchUnreadChatNotifications = async (options?: { force?: boolean }) => {
+        if (!options?.force && canUseConversationsForUnread()) {
+            syncUnreadFromList();
+            return unreadConversations.value;
+        }
+
         try {
-            const response = await messagesService.getConversations({
-                page: 1,
-                limit: 50,
-                unreadOnly: true,
-            });
+            const response = await dedupeRequest('unread-conversations', () =>
+                messagesService.getConversations({
+                    page: 1,
+                    limit: 50,
+                    unreadOnly: true,
+                })
+            );
             const unread = response.conversations.filter((c) => c.unreadCount > 0);
             unreadConversations.value = unread;
             unreadCount.value = unread.reduce((sum, c) => sum + c.unreadCount, 0);
@@ -410,6 +594,15 @@ export const useKrefasyStore = defineStore('krefasy', () => {
 
     const clearPendingChatConversationId = () => {
         pendingChatConversationId.value = null;
+        pendingChatDraftMessage.value = null;
+    };
+
+    const setPendingChatDraftMessage = (message: string | null) => {
+        pendingChatDraftMessage.value = message;
+    };
+
+    const clearPendingChatDraftMessage = () => {
+        pendingChatDraftMessage.value = null;
     };
 
     const updateConversationStatus = async (conversationId: string, status: string) => {
@@ -422,21 +615,37 @@ export const useKrefasyStore = defineStore('krefasy', () => {
             if (selectedConversation.value?.id === conversationId) {
                 selectedConversation.value = conversation;
             }
+            invalidateConversationsCache();
             return conversation;
         } catch (error) {
             throw error;
         }
     };
 
-    const fetchConversationStats = async () => {
+    const fetchConversationStats = async (options?: { force?: boolean }) => {
+        const cached = !options?.force ? getCachedStats() : null;
+        if (cached) {
+            conversationStats.value = cached;
+            return cached;
+        }
+
         try {
-            const stats = await messagesService.getConversationStats();
+            const stats = await dedupeRequest('conversation-stats', () =>
+                messagesService.getConversationStats()
+            );
             conversationStats.value = stats;
+            setCachedStats(stats);
             return stats;
         } catch (error) {
             throw error;
         }
     };
+
+    const setChatPageActive = (active: boolean) => {
+        isChatPageActive.value = active;
+    };
+
+    const hasCachedMessages = (conversationId: string) => touchMessagesCache(conversationId);
 
     // Ações do dashboard
     const fetchDashboardStats = async (loans?: DashboardLoan[]) => {
@@ -494,6 +703,12 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         unreadCount.value = 0;
         unreadConversations.value = [];
         pendingChatConversationId.value = null;
+        pendingChatDraftMessage.value = null;
+        activeConversationId.value = null;
+        messagesRefreshing.value = false;
+        isChatPageActive.value = false;
+        conversationsInitialLoad.value = true;
+        clearChatCache();
         notifications.value = [];
         notificationsCount.value = 0;
     };
@@ -544,6 +759,12 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         unreadCount,
         unreadConversations,
         pendingChatConversationId,
+        pendingChatDraftMessage,
+        activeConversationId,
+        messagesRefreshing,
+        conversationsRefreshing,
+        isChatPageActive,
+        conversationsInitialLoad,
         notifications,
         notificationsCount,
         dashboardStats,
@@ -552,6 +773,10 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         hasRole,
         hasPermission,
         isAdmin,
+        isPartner,
+        hasBackofficeAccess,
+        loggedUserId,
+        primaryRoleLabel,
 
         // Ações
         login,
@@ -581,6 +806,12 @@ export const useKrefasyStore = defineStore('krefasy', () => {
         fetchUnreadChatNotifications,
         setPendingChatConversationId,
         clearPendingChatConversationId,
+        setPendingChatDraftMessage,
+        clearPendingChatDraftMessage,
+        setActiveConversation,
+        setChatPageActive,
+        hasCachedMessages,
+        bumpConversationPreview,
         fetchDashboardStats,
         setDashboardOverdueParcels,
         resetStore,

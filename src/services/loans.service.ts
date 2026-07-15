@@ -1,10 +1,14 @@
 import apiService, { ApiResponse, PaginationParams, BaseFilters } from './api';
+import { normalizeApiObject } from './messages.service';
 
 // Interfaces para empréstimos
 export interface Loan {
     id: string;
     customerEmail: string;
     customerName: string;
+    customerId?: string | null;
+    clientId?: string | null;
+    managerId?: string | null;
     productType: 'PERSONAL' | 'BUSINESS' | 'MORTGAGE' | 'VEHICLE' | 'EDUCATION';
     amount: number;
     interestRate: number;
@@ -67,6 +71,7 @@ export interface UpdateLoanRequest {
 export interface LoanApprovalRequest {
     approved: boolean;
     reason?: string;
+    rejectionReason?: string;
     conditions?: string[];
     modifiedAmount?: number;
     modifiedInterestRate?: number;
@@ -105,13 +110,14 @@ export class LoansService {
 
         // A API retorna { succeeded, message, description, errors, data: { total, currentPage, pages, limit, data } }
         const apiData = response.data;
+        const requestLimit = params.limit ?? 10;
 
         return {
             loans: apiData.data || [],
             total: apiData.total || 0,
-            page: apiData.currentPage || 1,
-            limit: apiData.limit || 10,
-            totalPages: apiData.pages || 0
+            page: apiData.currentPage || params.page || 1,
+            limit: apiData.limit || requestLimit,
+            totalPages: apiData.pages || Math.max(1, Math.ceil((apiData.total || 0) / (apiData.limit || requestLimit)))
         };
     }
 
@@ -140,7 +146,7 @@ export class LoansService {
         if (!response.data) {
             throw new Error('Empréstimo não encontrado');
         }
-        return response.data;
+        return normalizeApiObject<Loan>(response.data);
     }
 
     // Criar novo empréstimo
@@ -183,7 +189,7 @@ export class LoansService {
         if (!response.data) {
             throw new Error('Erro ao aprovar empréstimo');
         }
-        return response.data;
+        return normalizeApiObject<Loan>(response.data);
     }
 
     // Aprovar empréstimo com Stripe
@@ -208,7 +214,7 @@ export class LoansService {
         if (!response.data) {
             throw new Error('Erro ao aprovar empréstimo com Stripe');
         }
-        return response.data;
+        return normalizeApiObject<Loan>(response.data);
     }
 
     // Disbursar empréstimo (transferir dinheiro)

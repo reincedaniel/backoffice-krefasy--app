@@ -1,343 +1,341 @@
 <template>
-    <div>
+    <div class="space-y-5">
         <PageHeader
             title="Empréstimos"
             subtitle="Gerencie a carteira de crédito e acompanhe o status dos empréstimos"
             :breadcrumbs="[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Empréstimos' }]"
         />
 
-        <!-- Header com Estatísticas -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="panel">
-                <div class="flex items-center justify-between">
+        <!-- Loading inicial -->
+        <div v-if="initialLoading" class="panel flex flex-col items-center justify-center py-24">
+            <span class="animate-spin border-4 border-primary border-l-transparent rounded-full w-12 h-12"></span>
+            <p class="mt-4 text-sm text-gray-600 dark:text-gray-300">Carregando empréstimos...</p>
+        </div>
+
+        <template v-else>
+        <!-- Estatísticas -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="panel overflow-hidden relative">
+                <div class="absolute inset-y-0 left-0 w-1 bg-primary"></div>
+                <div class="flex items-center justify-between pl-3">
                     <div>
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Empréstimos</p>
-                        <p class="text-2xl font-bold text-primary">{{ totalLoans }}</p>
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Total</p>
+                        <p class="text-3xl font-bold text-primary mt-1">{{ totalLoans }}</p>
                     </div>
-                    <div class="p-3 bg-primary/10 rounded-full">
+                    <div class="p-3 rounded-xl bg-primary/10">
                         <icon-file class="w-6 h-6 text-primary" />
                     </div>
                 </div>
             </div>
 
-            <div class="panel">
-                <div class="flex items-center justify-between">
+            <div class="panel overflow-hidden relative">
+                <div class="absolute inset-y-0 left-0 w-1 bg-warning"></div>
+                <div class="flex items-center justify-between pl-3">
                     <div>
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Pendentes</p>
-                        <p class="text-2xl font-bold text-warning">{{ pendingCount }}</p>
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Nesta página — Pendentes</p>
+                        <p class="text-3xl font-bold text-warning mt-1">{{ pendingCount }}</p>
                     </div>
-                    <div class="p-3 bg-warning/10 rounded-full">
+                    <div class="p-3 rounded-xl bg-warning/10">
                         <icon-clock class="w-6 h-6 text-warning" />
                     </div>
                 </div>
             </div>
 
-            <div class="panel">
-                <div class="flex items-center justify-between">
+            <div class="panel overflow-hidden relative">
+                <div class="absolute inset-y-0 left-0 w-1 bg-success"></div>
+                <div class="flex items-center justify-between pl-3">
                     <div>
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Aprovados</p>
-                        <p class="text-2xl font-bold text-success">{{ approvedCount }}</p>
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Nesta página — Aprovados</p>
+                        <p class="text-3xl font-bold text-success mt-1">{{ approvedCount }}</p>
                     </div>
-                    <div class="p-3 bg-success/10 rounded-full">
+                    <div class="p-3 rounded-xl bg-success/10">
                         <icon-square-check class="w-6 h-6 text-success" />
                     </div>
                 </div>
             </div>
-
-            <!-- <div class="panel">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Valor Total</p>
-                        <p class="text-2xl font-bold text-info">{{ formatCurrency(totalAmount) }}</p>
-                    </div>
-                    <div class="p-3 bg-info/10 rounded-full">
-                        <icon-dollar-sign class="w-6 h-6 text-info" />
-                    </div>
-                </div>
-            </div> -->
         </div>
 
-        <!-- Filtros e Ações -->
-        <div class="panel mt-5">
-            <div class="flex flex-col gap-4">
-                <!-- Row 1: Selects bem divididos e responsivos -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                        <label class="form-label">Status</label>
-                        <select v-model="filters.status" @change="applyFilters" class="form-select w-full">
-                            <option value="">Todos os Status</option>
-                            <option v-for="status in activeLoanStatuses" :key="status.id" :value="status.id">
-                                {{ status.name }}
-                            </option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label">Produto</label>
-                        <select v-model="filters.product" @change="applyFilters" class="form-select w-full">
-                            <option value="">Todos os Produtos</option>
-                            <option v-for="product in loanProducts" :key="product.id" :value="product.id">
-                                {{ product.name }}
-                            </option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label">Moeda</label>
-                        <select v-model="filters.currency" @change="applyFilters" class="form-select w-full">
-                            <option value="">Todas as Moedas</option>
-                            <option v-for="currency in activeCurrencies" :key="currency.id" :value="currency.id">
-                                {{ currency.code }} — {{ currency.name }}
-                            </option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label">Gestores</label>
-                        <select v-model="filters.managerId" @change="applyFilters" class="form-select w-full" aria-label="Gestores">
-                            <option v-for="opt in managerOptions" :key="opt.value || 'all'" :value="opt.value">
-                                <strong v-if="opt.isBold">{{ opt.label }}</strong>
-                                <span v-else>{{ opt.label }}</span>
-                            </option>
-                        </select>
-                    </div>
-                </div>
+        <!-- Filtros -->
+        <div class="panel">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Filtros e pesquisa</h2>
+                <button
+                    v-if="hasActiveFilters || searchQuery"
+                    @click="clearFilters"
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm gap-1"
+                >
+                    <icon-x class="w-4 h-4" />
+                    Limpar
+                </button>
+            </div>
 
-                <!-- Row 2: Campo de busca (col-12) -->
-                <div class="w-full">
-                    <label class="form-label">Buscar</label>
-                    <input
-                        v-model="searchQuery"
-                        @input="debounceSearch"
-                        type="text"
-                        class="form-input w-full"
-                        placeholder="Buscar por número, cliente..."
-                    />
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label class="form-label">Status</label>
+                    <select v-model="filters.status" @change="applyFilters" class="form-select w-full">
+                        <option value="">Todos os Status</option>
+                        <option v-for="status in activeLoanStatuses" :key="status.id" :value="status.id">
+                            {{ status.name }}
+                        </option>
+                    </select>
                 </div>
+                <div>
+                    <label class="form-label">Produto</label>
+                    <select v-model="filters.product" @change="applyFilters" class="form-select w-full">
+                        <option value="">Todos os Produtos</option>
+                        <option v-for="product in loanProducts" :key="product.id" :value="product.id">
+                            {{ product.name }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Moeda</label>
+                    <select v-model="filters.currency" @change="applyFilters" class="form-select w-full">
+                        <option value="">Todas as Moedas</option>
+                        <option v-for="currency in activeCurrencies" :key="currency.id" :value="currency.id">
+                            {{ currency.code }} — {{ currency.name }}
+                        </option>
+                    </select>
+                </div>
+                <div v-if="!isRestrictedPartnerView">
+                    <label class="form-label">Gestores</label>
+                    <select v-model="filters.managerId" @change="applyFilters" class="form-select w-full" aria-label="Gestores">
+                        <option v-for="opt in managerOptions" :key="opt.value || 'all'" :value="opt.value">
+                            {{ opt.label }}
+                        </option>
+                    </select>
+                </div>
+                <div v-else>
+                    <label class="form-label">Âmbito</label>
+                    <select v-model="partnerManagerFilter" @change="applyFilters" class="form-select w-full" aria-label="Âmbito partner">
+                        <option v-for="opt in partnerScopeOptions" :key="opt.value" :value="opt.value">
+                            {{ opt.label }}
+                        </option>
+                    </select>
+                </div>
+            </div>
 
-                <!-- Row 3: Meus Clientes à esquerda, restantes à direita -->
-                <div class="flex justify-between items-center gap-2">
-                    <button
-                        @click="filterMyClients"
-                        type="button"
-                        class="btn btn-info btn-sm gap-2"
-                    >
-                        <icon-star class="w-4 h-4" />
-                        Meus Emprestimos
-                    </button>
-                    <div class="flex gap-2">
-                    <button
-                        @click="clearFilters"
-                        type="button"
-                        class="btn btn-outline-secondary btn-sm gap-2"
-                    >
-                        <icon-x class="w-4 h-4" />
-                        Limpar
-                    </button>
-                    <button
-                        @click="exportLoans"
-                        type="button"
-                        class="btn btn-outline-primary btn-sm gap-2"
-                    >
-                        <icon-download class="w-4 h-4" />
-                        Exportar
-                    </button>
-                    <router-link
-                        to="/loans/add"
-                        class="btn btn-primary btn-sm gap-2"
-                    >
-                        <icon-plus class="w-4 h-4" />
-                        Novo Empréstimo
-                    </router-link>
-                    </div>
-                </div>
+            <div class="mb-4">
+                <label class="form-label">Buscar</label>
+                <input
+                    v-model="searchQuery"
+                    @input="debounceSearch"
+                    type="text"
+                    class="form-input w-full"
+                    placeholder="Número do empréstimo, cliente, email..."
+                />
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                <button v-if="isRestrictedPartnerView" @click="setPartnerScope('mine')" type="button" class="btn btn-info btn-sm gap-2">
+                    <icon-star class="w-4 h-4" />
+                    Meus Empréstimos
+                </button>
+                <button v-if="!isRestrictedPartnerView" @click="filterMyClients" type="button" class="btn btn-info btn-sm gap-2">
+                    <icon-star class="w-4 h-4" />
+                    Meus Empréstimos
+                </button>
+                <button @click="listPendingLoans" type="button" class="btn btn-warning btn-sm gap-2">
+                    <icon-clock class="w-4 h-4" />
+                    Listar Pendentes
+                </button>
+                <button v-if="!isRestrictedPartnerView" @click="listAllLoans" type="button" class="btn btn-outline-primary btn-sm gap-2">
+                    <icon-file class="w-4 h-4" />
+                    Ver TODOS
+                </button>
             </div>
         </div>
 
-        <!-- Lista de Empréstimos -->
-        <div class="panel mt-5">
-            <!-- Loading -->
-            <div v-if="loading" class="flex items-center justify-center py-12">
-                        <div class="flex flex-col items-center gap-4">
-                    <span class="animate-spin border-4 border-primary border-l-transparent rounded-full w-10 h-10 inline-block"></span>
-                            <span class="text-sm text-gray-600 dark:text-gray-300">Carregando empréstimos...</span>
-                        </div>
-                    </div>
+        <!-- Lista -->
+        <div class="panel !p-0 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Empréstimos</h2>
+                    <p v-if="totalLoans > 0" class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                        {{ paginationSummary }}
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Por página:</label>
+                    <select v-model.number="pageSize" @change="changePageSize" class="form-select form-select-sm w-auto">
+                        <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+                    </select>
+                </div>
+            </div>
 
-            <!-- Lista de Cards -->
-            <div v-else-if="loans.length > 0" class="space-y-4">
-                <div
+            <div v-if="loading" class="flex items-center justify-center py-16">
+                <div class="flex flex-col items-center gap-4">
+                    <span class="animate-spin border-4 border-primary border-l-transparent rounded-full w-10 h-10"></span>
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Carregando empréstimos...</span>
+                </div>
+            </div>
+
+            <div v-else-if="loans.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
+                <article
                     v-for="loan in loans"
                     :key="loan.id"
-                    class="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow"
+                    class="p-5 hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition-colors"
+                    :class="getStatusBorderClass(loan.loanStatusName)"
                 >
-                    <div class="flex flex-col lg:flex-row gap-4">
-                        <!-- Informações Principais -->
-                        <div class="flex-1">
-                            <div class="flex items-start justify-between mb-3">
+                    <div class="flex flex-col xl:flex-row xl:items-start gap-5">
+                        <div class="flex-1 min-w-0 space-y-4">
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                                 <div>
-                                    <h3 class="text-lg font-semibold text-primary">{{ loan.loanNumber }}</h3>
-                                    <p class="text-sm text-gray-600 dark:text-gray-400">{{ loan.customerName }}</p>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h3 class="text-lg font-bold text-primary">{{ loan.loanNumber }}</h3>
+                                        <span class="badge" :class="getStatusBadgeClass(loan.loanStatusName)">
+                                            {{ loan.loanStatusName }}
+                                        </span>
+                                    </div>
+                                    <p class="text-sm font-medium text-gray-800 dark:text-gray-200 mt-1">{{ loan.customerName }}</p>
                                     <p class="text-xs text-gray-500">{{ loan.customerEmail }}</p>
                                 </div>
+                                <div class="text-left sm:text-right shrink-0">
+                                    <p class="text-xs text-gray-500">Valor solicitado</p>
+                                    <p class="text-xl font-bold text-gray-900 dark:text-white">
+                                        {{ formatCurrency(loan.requestedAmount, loan.currencySymbol, loan.currencyCode) }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">Criado em {{ formatDate(loan.createdAt) }}</p>
+                                </div>
+                            </div>
 
-                                <div class="text-right">
-                                    <span class="badge" :class="getStatusBadgeClass(loan.loanStatusName)">
-                                        {{ loan.loanStatusName }}
-                                    </span>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        Criado em {{ formatDate(loan.createdAt) }}
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div class="rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                                    <p class="text-xs text-gray-500">Produto</p>
+                                    <p class="text-sm font-semibold truncate">{{ loan.loanProductName }}</p>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                                    <p class="text-xs text-gray-500">Aprovado</p>
+                                    <p class="text-sm font-semibold">
+                                        {{ loan.approvedAmount > 0 ? formatCurrency(loan.approvedAmount, loan.currencySymbol, loan.currencyCode) : '—' }}
                                     </p>
                                 </div>
-                            </div>
-
-                            <!-- Detalhes do Empréstimo -->
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                    <p class="text-gray-600 dark:text-gray-400">Produto</p>
-                                    <p class="font-medium">{{ loan.loanProductName }}</p>
+                                <div class="rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                                    <p class="text-xs text-gray-500">Parcelas</p>
+                                    <p class="text-sm font-semibold">
+                                        {{ loan.numberOfInstallments }}× {{ formatCurrency(loan.monthlyPayment || 0, loan.currencySymbol, loan.currencyCode) }}
+                                    </p>
                                 </div>
-
-                                <div>
-                                    <p class="text-gray-600 dark:text-gray-400">Valor Solicitado</p>
-                                    <p class="font-medium">{{ formatCurrency(loan.requestedAmount, loan.currencySymbol, loan.currencyCode) }}</p>
-                                </div>
-
-                                <div>
-                                    <p class="text-gray-600 dark:text-gray-400">Valor Aprovado</p>
-                                    <p class="font-medium">{{ formatCurrency(loan.approvedAmount || 0, loan.currencySymbol, loan.currencyCode) }}</p>
-                                </div>
-
-                                <div>
-                                    <p class="text-gray-600 dark:text-gray-400">Parcelas</p>
-                                    <p class="font-medium">{{ loan.numberOfInstallments }}x {{ formatCurrency(loan.monthlyPayment || 0, loan.currencySymbol, loan.currencyCode) }}</p>
+                                <div class="rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                                    <p class="text-xs text-gray-500">Juros / Período</p>
+                                    <p class="text-sm font-semibold">{{ loan.interestRate }}% · {{ loan.interestPeriodName }}</p>
                                 </div>
                             </div>
 
-                            <!-- Informações Adicionais -->
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mt-3">
-                                <div>
-                                    <p class="text-gray-600 dark:text-gray-400">Taxa de Juros</p>
-                                    <p class="font-medium">{{ loan.interestRate }}%</p>
-                                </div>
-
-                                <div>
-                                    <p class="text-gray-600 dark:text-gray-400">Período</p>
-                                    <p class="font-medium">{{ loan.interestPeriodName }}</p>
-                                </div>
-
-                                <div v-if="loan.managerName">
-                                    <p class="text-gray-600 dark:text-gray-400">Gestor</p>
-                                    <p class="font-medium">{{ loan.managerName }}</p>
-                                </div>
-                            </div>
+                            <p v-if="loan.managerName" class="text-xs text-gray-500">
+                                Gestor: <span class="font-medium text-gray-700 dark:text-gray-300">{{ loan.managerName }}</span>
+                            </p>
                         </div>
 
-                        <!-- Ações -->
-                        <div class="flex flex-col gap-2 lg:min-w-[120px]">
-                            <router-link
-                                :to="`/loans/view/${loan.id}`"
-                                class="btn btn-outline-primary btn-sm gap-2"
-                            >
-                                <icon-eye />
+                        <div class="flex flex-row xl:flex-col gap-2 xl:min-w-[140px] shrink-0">
+                            <router-link :to="`/loans/view/${loan.id}`" class="btn btn-primary btn-sm gap-2 flex-1 xl:flex-none justify-center">
+                                <icon-eye class="w-4 h-4" />
                                 Ver Detalhes
                             </router-link>
-
-                            <!-- <router-link
-                                :to="`/loans/edit/${loan.id}`"
-                                class="btn btn-outline-info btn-sm gap-2"
-                            >
-                                <icon-edit />
-                                Editar
-                                </router-link> -->
-
-                            <button
+                            <router-link
                                 v-if="canApproveLoan(loan)"
-                                @click="quickApprove(loan)"
-                                class="btn btn-outline-success btn-sm gap-2"
+                                :to="`/loans/view/${loan.id}`"
+                                class="btn btn-outline-success btn-sm gap-2 flex-1 xl:flex-none justify-center"
                             >
-                                <icon-square-check />
+                                <icon-square-check class="w-4 h-4" />
                                 Aprovar
-                            </button>
-
+                            </router-link>
                             <button
                                 v-if="canRejectLoan(loan)"
                                 @click="quickReject(loan)"
-                                class="btn btn-outline-danger btn-sm gap-2"
+                                class="btn btn-outline-danger btn-sm gap-2 flex-1 xl:flex-none justify-center"
                             >
-                                <icon-x-circle />
+                                <icon-x-circle class="w-4 h-4" />
                                 Rejeitar
                             </button>
-
                             <span
                                 v-if="!canApproveLoan(loan) && !canRejectLoan(loan)"
-                                class="text-xs text-gray-500 text-center"
+                                class="text-xs text-gray-500 text-center py-2"
                             >
                                 {{ getActionButtonText(loan) }}
                             </span>
                         </div>
                     </div>
-                </div>
+                </article>
             </div>
 
-            <!-- Estado Vazio -->
-            <div v-else class="text-center py-12">
-                <icon-file class="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <div v-else class="text-center py-16 px-5">
+                <icon-file class="w-14 h-14 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Nenhum empréstimo encontrado</h3>
-                <p class="text-gray-600 dark:text-gray-400 mb-4">
-                    {{ searchQuery || hasActiveFilters ? 'Tente ajustar os filtros de busca.' : 'Comece criando um novo empréstimo.' }}
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ searchQuery || hasActiveFilters ? 'Tente ajustar os filtros de busca.' : 'Não há empréstimos para exibir.' }}
                 </p>
-                <router-link v-if="!searchQuery && !hasActiveFilters" to="/loans/add" class="btn btn-primary gap-2">
-                    <icon-plus />
-                    Novo Empréstimo
-                                </router-link>
             </div>
-        </div>
 
-        <!-- Paginação -->
-        <div v-if="totalPages > 1" class="panel mt-5">
-            <div class="flex items-center justify-between">
-                <div class="text-sm text-gray-600 dark:text-gray-400">
-                    Mostrando {{ ((currentPage - 1) * pageSize) + 1 }} a {{ Math.min(currentPage * pageSize, totalLoans) }} de {{ totalLoans }} empréstimos
-                </div>
+            <!-- Paginação -->
+            <div
+                v-if="totalLoans > 0"
+                class="px-5 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/20"
+            >
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 order-2 sm:order-1">
+                        Página <strong>{{ currentPage }}</strong> de <strong>{{ totalPages }}</strong>
+                        · {{ paginationSummary }}
+                    </p>
 
-                <div class="flex gap-2">
-                    <button
-                        @click="changePage(currentPage - 1)"
-                        :disabled="currentPage === 1"
-                        class="btn btn-outline-secondary btn-sm"
-                    >
-                        <icon-arrow-left />
-                        Anterior
-                    </button>
+                    <div class="flex items-center gap-1 order-1 sm:order-2">
+                        <button
+                            @click="changePage(1)"
+                            :disabled="currentPage === 1"
+                            class="btn btn-outline-secondary btn-sm px-2"
+                            title="Primeira página"
+                        >
+                            «
+                        </button>
+                        <button
+                            @click="changePage(currentPage - 1)"
+                            :disabled="currentPage === 1"
+                            class="btn btn-outline-secondary btn-sm gap-1"
+                        >
+                            <icon-arrow-left class="w-4 h-4" />
+                            Anterior
+                        </button>
 
-                    <div class="flex gap-1">
                         <button
                             v-for="page in visiblePages"
                             :key="page"
                             @click="changePage(page)"
                             :class="[
-                                'btn btn-sm',
+                                'btn btn-sm min-w-[2.25rem]',
                                 page === currentPage ? 'btn-primary' : 'btn-outline-secondary'
                             ]"
                         >
                             {{ page }}
-                                </button>
-                            </div>
+                        </button>
 
-                    <button
-                        @click="changePage(currentPage + 1)"
-                        :disabled="currentPage === totalPages"
-                        class="btn btn-outline-secondary btn-sm"
-                    >
-                        Próximo
-                        <icon-arrow-forward />
-                    </button>
+                        <button
+                            @click="changePage(currentPage + 1)"
+                            :disabled="currentPage >= totalPages"
+                            class="btn btn-outline-secondary btn-sm gap-1"
+                        >
+                            Próximo
+                            <icon-arrow-forward class="w-4 h-4" />
+                        </button>
+                        <button
+                            @click="changePage(totalPages)"
+                            :disabled="currentPage >= totalPages"
+                            class="btn btn-outline-secondary btn-sm px-2"
+                            title="Última página"
+                        >
+                            »
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
+        </template>
     </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useMeta } from '@/composables/use-meta';
 import { useKrefasyStore } from '@/stores/index';
 import userService from '@/services/users.service';
@@ -346,18 +344,19 @@ import authService from '@/services/auth.service';
 import { loanProductService } from '@/services/loan-products.service';
 import { currencyService } from '@/services/currencies.service';
 import Swal from 'sweetalert2';
+import { useLoanDecisionDialogs } from '@/composables/use-loan-decision-dialogs';
+import { usePartnerScope } from '@/composables/use-partner-scope';
+import {
+    filterLoansForPartner,
+    type PartnerManagerFilter,
+} from '@/utils/partner-scope.utils';
 
-// Icons
 import PageHeader from '@/components/layout/PageHeader.vue';
 import IconFile from '@/components/icon/icon-file.vue';
 import IconClock from '@/components/icon/icon-clock.vue';
 import IconSquareCheck from '@/components/icon/icon-square-check.vue';
-import IconDollarSign from '@/components/icon/icon-dollar-sign.vue';
 import IconX from '@/components/icon/icon-x.vue';
-import IconDownload from '@/components/icon/icon-download.vue';
-import IconPlus from '@/components/icon/icon-plus.vue';
 import IconEye from '@/components/icon/icon-eye.vue';
-import IconEdit from '@/components/icon/icon-edit.vue';
 import IconStar from '@/components/icon/icon-star.vue';
 import IconXCircle from '@/components/icon/icon-x-circle.vue';
 import IconArrowLeft from '@/components/icon/icon-arrow-left.vue';
@@ -366,30 +365,32 @@ import IconArrowForward from '@/components/icon/icon-arrow-forward.vue';
 useMeta({ title: 'Gestão de Empréstimos' });
 
 const store = useKrefasyStore();
+const router = useRouter();
+const { handleApprove, handleReject } = useLoanDecisionDialogs();
+const { isRestrictedPartnerView, loggedUserId } = usePartnerScope();
 
-/** userId do user logado (USER_LOGIN.userId ou USER_LOGIN.user.id) para usar em ManagerId. */
-const loggedUserId = computed(() => {
-    const data = authService.getLoginData();
-    return data?.userId ?? data?.user?.id ?? '';
-});
+const partnerManagerFilter = ref<PartnerManagerFilter>('all');
+const partnerAllLoans = ref<any[]>([]);
+const partnerLoansLoaded = ref(false);
 
-// Estado reativo
 const loans = ref<any[]>([]);
+const initialLoading = ref(true);
 const loading = ref(false);
 const searchQuery = ref('');
 const currentPage = ref(1);
 const pageSize = ref(10);
+const pageSizeOptions = [5, 10, 20, 50];
 const totalLoans = ref(0);
-const totalPages = ref(0);
+const totalPages = ref(1);
 const pendingLoans = ref(0);
 const approvedLoans = ref(0);
 const totalAmount = ref(0);
 
-// Filtros (por padrão "Meus Empréstimos" = gestor = user logado)
 const getDefaultManagerId = () => {
     const data = authService.getLoginData();
     return data?.userId ?? data?.user?.id ?? '';
 };
+
 const filters = ref({
     status: '',
     product: '',
@@ -397,45 +398,52 @@ const filters = ref({
     managerId: getDefaultManagerId()
 });
 
-// Dados para filtros
+const PENDING_STATUS_ID = 'a0000000-0000-0000-0000-000000000001';
+
 const loanStatuses = ref<any[]>([]);
 const loanProducts = ref<any[]>([]);
 const currencies = ref<any[]>([]);
 const managers = ref<any[]>([]);
 
-// Debounce para busca
 let searchTimeout: ReturnType<typeof setTimeout>;
 
-// Computed properties
-const pendingCount = computed(() => {
-    return loans.value.filter(loan => loan.loanStatusName === 'Pendente').length;
+const pendingCount = computed(() => loans.value.filter(loan => loan.loanStatusName === 'Pendente').length);
+const approvedCount = computed(() => loans.value.filter(loan => loan.loanStatusName === 'Aprovado').length);
+
+const paginationSummary = computed(() => {
+    if (totalLoans.value === 0) return '';
+    const start = (currentPage.value - 1) * pageSize.value + 1;
+    const end = Math.min(currentPage.value * pageSize.value, totalLoans.value);
+    return `Mostrando ${start}–${end} de ${totalLoans.value} empréstimos`;
 });
 
-const approvedCount = computed(() => {
-    return loans.value.filter(loan => loan.loanStatusName === 'Aprovado').length;
-});
-
-// totalAmount é calculado dinamicamente no fetchLoans
-
-// Opções do select Gestores: Todos, MEUS EMPRÉSTIMOS (user logado), depois os restantes users
 const managerOptions = computed(() => {
-    const opts: { value: string; label: string, isBold?: boolean }[] = [
+    const opts: { value: string; label: string; isBold?: boolean }[] = [
         { value: '', label: 'Todos os Gestores', isBold: true }
     ];
     if (loggedUserId.value) {
         opts.push({ isBold: true, value: loggedUserId.value, label: 'MEUS EMPRÉSTIMOS' });
     }
-    const others = managers.value.filter((u: any) => u.id !== loggedUserId.value);
-    others.forEach((u: any) => opts.push({ value: u.id, label: u.name || u.email }));
+    managers.value
+        .filter((u: any) => u.id !== loggedUserId.value)
+        .forEach((u: any) => opts.push({ value: u.id, label: u.name || u.email }));
     return opts;
 });
 
+const partnerScopeOptions = computed(() => [
+    { value: 'all' as PartnerManagerFilter, label: 'Meus + sem gestor' },
+    { value: 'mine' as PartnerManagerFilter, label: 'Só meus empréstimos' },
+    { value: 'unassigned' as PartnerManagerFilter, label: 'Sem gestor' },
+]);
+
 const hasActiveFilters = computed(() => {
+    const partnerScopeActive = isRestrictedPartnerView.value && partnerManagerFilter.value !== 'all';
     return (
         filters.value.status ||
         filters.value.product ||
         filters.value.currency ||
-        (filters.value.managerId && filters.value.managerId !== loggedUserId.value)
+        partnerScopeActive ||
+        (!isRestrictedPartnerView.value && filters.value.managerId && filters.value.managerId !== loggedUserId.value)
     );
 });
 
@@ -443,11 +451,7 @@ const visiblePages = computed(() => {
     const pages: number[] = [];
     const start = Math.max(1, currentPage.value - 2);
     const end = Math.min(totalPages.value, currentPage.value + 2);
-
-    for (let i = start; i <= end; i++) {
-        pages.push(i);
-    }
-
+    for (let i = start; i <= end; i++) pages.push(i);
     return pages;
 });
 
@@ -459,44 +463,108 @@ const activeCurrencies = computed(() =>
     currencies.value.filter((c: { isActive?: boolean }) => c.isActive !== false)
 );
 
-// Métodos
+function applyLoanResponse(response: { loans?: any[]; total?: number; totalPages?: number; page?: number; limit?: number }) {
+    if (response?.loans) {
+        loans.value = response.loans;
+        totalLoans.value = response.total ?? 0;
+        totalPages.value = Math.max(1, response.totalPages ?? 1);
+        if (response.page) currentPage.value = response.page;
+        pendingLoans.value = loans.value.filter(loan => loan.loanStatusName === 'Pendente').length;
+        approvedLoans.value = loans.value.filter(loan => loan.loanStatusName === 'Aprovado').length;
+        totalAmount.value = loans.value.reduce((sum, loan) => sum + (loan.requestedAmount || 0), 0);
+    } else {
+        loans.value = [];
+        totalLoans.value = 0;
+        totalPages.value = 1;
+        pendingLoans.value = 0;
+        approvedLoans.value = 0;
+        totalAmount.value = 0;
+    }
+}
+
+function matchesLocalLoanFilters(loan: any): boolean {
+    if (filters.value.status) {
+        const statusId = loan.loanStatusId || loan.statusId;
+        if (String(statusId) !== String(filters.value.status)) return false;
+    }
+    if (filters.value.product) {
+        const productId = loan.loanProductId || loan.productId;
+        if (String(productId) !== String(filters.value.product)) return false;
+    }
+    if (filters.value.currency) {
+        const currencyId = loan.currencyId;
+        if (String(currencyId) !== String(filters.value.currency)) return false;
+    }
+    if (searchQuery.value.trim()) {
+        const q = searchQuery.value.trim().toLowerCase();
+        const haystack = [
+            loan.loanNumber,
+            loan.customerName,
+            loan.clientName,
+            loan.customerEmail,
+            loan.clientEmail,
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+        if (!haystack.includes(q)) return false;
+    }
+    return true;
+}
+
+function applyPartnerLoansPage() {
+    const scoped = filterLoansForPartner(
+        partnerAllLoans.value,
+        loggedUserId.value,
+        partnerManagerFilter.value
+    );
+    const filtered = scoped.filter(matchesLocalLoanFilters);
+    const total = filtered.length;
+    const pages = Math.max(1, Math.ceil(total / pageSize.value));
+    if (currentPage.value > pages) currentPage.value = pages;
+
+    const start = (currentPage.value - 1) * pageSize.value;
+    const pageItems = filtered.slice(start, start + pageSize.value);
+
+    applyLoanResponse({
+        loans: pageItems,
+        total,
+        totalPages: pages,
+        page: currentPage.value,
+        limit: pageSize.value,
+    });
+}
+
+async function ensurePartnerLoansLoaded(force = false) {
+    if (partnerLoansLoaded.value && !force) return;
+    partnerAllLoans.value = await loansService.getAllLoans();
+    partnerLoansLoaded.value = true;
+}
+
+function buildLoanParams(overrideManagerId?: string) {
+    const params: Record<string, unknown> = {
+        Page: currentPage.value,
+        Limit: pageSize.value,
+    };
+    if (filters.value.status) params.StatusId = filters.value.status;
+    if (filters.value.product) params.LoanProductId = filters.value.product;
+    if (filters.value.currency) params.CurrencyId = filters.value.currency;
+    if (overrideManagerId) params.ManagerId = overrideManagerId;
+    else if (filters.value.managerId) params.ManagerId = filters.value.managerId;
+    if (searchQuery.value) params.Search = searchQuery.value;
+    return params;
+}
+
 const fetchLoans = async (overrideManagerId?: string) => {
     try {
         loading.value = true;
-
-        const params: any = {
-            Page: currentPage.value,
-            Limit: pageSize.value
-        };
-
-        // Adicionar filtros usando os nomes corretos da API
-        if (filters.value.status) params.StatusId = filters.value.status;
-        if (filters.value.product) params.LoanProductId = filters.value.product;
-        if (filters.value.currency) params.CurrencyId = filters.value.currency;
-        // ManagerId: priorizar override explícito (ex: botão Meus Clientes), depois filtro
-        if (overrideManagerId) params.ManagerId = overrideManagerId;
-        else if (filters.value.managerId) params.ManagerId = filters.value.managerId;
-        if (searchQuery.value) params.Search = searchQuery.value;
-
-        const response = await store.fetchLoans(params);
-
-        if (response?.loans) {
-            loans.value = response.loans;
-            totalLoans.value = response.total;
-            totalPages.value = response.totalPages;
-
-            // Calcular estatísticas do dashboard
-            pendingLoans.value = loans.value.filter(loan => loan.loanStatusName === 'Pendente').length;
-            approvedLoans.value = loans.value.filter(loan => loan.loanStatusName === 'Aprovado').length;
-            totalAmount.value = loans.value.reduce((sum, loan) => sum + (loan.requestedAmount || 0), 0);
-        } else {
-            loans.value = [];
-            totalLoans.value = 0;
-            totalPages.value = 1;
-            pendingLoans.value = 0;
-            approvedLoans.value = 0;
-            totalAmount.value = 0;
+        if (isRestrictedPartnerView.value) {
+            await ensurePartnerLoansLoaded();
+            applyPartnerLoansPage();
+            return;
         }
+        const response = await store.fetchLoans(buildLoanParams(overrideManagerId));
+        applyLoanResponse(response);
     } catch (error) {
         console.error('Erro ao buscar empréstimos:', error);
         await Swal.fire({
@@ -514,37 +582,23 @@ const fetchFilterData = async () => {
     try {
         const [statuses, productsRes, currenciesRes] = await Promise.all([
             store.fetchLoanStatuses(),
-            loanProductService.getLoanProducts({
-                search: '',
-                country: '',
-                page: 1,
-                limit: 100
-            }),
+            loanProductService.getLoanProducts({ search: '', country: '', page: 1, limit: 100 }),
             currencyService.getCurrencies({ page: 1, limit: 100 })
         ]);
 
         loanStatuses.value = Array.isArray(statuses) ? statuses : [];
+        loanProducts.value = productsRes.succeeded && productsRes.data ? productsRes.data : [];
+        currencies.value = currenciesRes.succeeded && currenciesRes.data ? currenciesRes.data : [];
 
-        if (productsRes.succeeded && productsRes.data) {
-            loanProducts.value = productsRes.data;
-        } else {
-            loanProducts.value = [];
-        }
-
-        if (currenciesRes.succeeded && currenciesRes.data) {
-            currencies.value = currenciesRes.data;
-        } else {
-            currencies.value = [];
-        }
-
-        // Buscar users para filtro Gestores (API /api/v1/users)
-        const usersRes = await userService.getUsers();
-        if (usersRes.succeeded && usersRes.data?.data) {
-            managers.value = usersRes.data.data.filter(
-                (u: { roles?: string[] }) => !u.roles?.includes('Client')
-            );
-        } else {
-            managers.value = [];
+        if (!isRestrictedPartnerView.value) {
+            const usersRes = await userService.getUsers();
+            if (usersRes.succeeded && usersRes.data?.data) {
+                managers.value = usersRes.data.data.filter(
+                    (u: { roles?: string[] }) => !u.roles?.includes('Client')
+                );
+            } else {
+                managers.value = [];
+            }
         }
     } catch (error) {
         console.error('Erro ao buscar dados para filtros:', error);
@@ -552,9 +606,7 @@ const fetchFilterData = async () => {
 };
 
 const debounceSearch = () => {
-    if (searchTimeout) {
-        clearTimeout(searchTimeout);
-    }
+    if (searchTimeout) clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
         currentPage.value = 1;
         fetchLoans();
@@ -562,6 +614,17 @@ const debounceSearch = () => {
 };
 
 const applyFilters = () => {
+    currentPage.value = 1;
+    fetchLoans();
+};
+
+const changePageSize = () => {
+    currentPage.value = 1;
+    fetchLoans();
+};
+
+const setPartnerScope = (scope: PartnerManagerFilter) => {
+    partnerManagerFilter.value = scope;
     currentPage.value = 1;
     fetchLoans();
 };
@@ -581,35 +644,8 @@ const filterMyClients = async () => {
         loading.value = true;
         filters.value = { ...filters.value, managerId };
         currentPage.value = 1;
-
-        const params: any = {
-            Page: 1,
-            Limit: pageSize.value,
-            ManagerId: managerId,
-            managerId: managerId
-        };
-        if (filters.value.status) params.StatusId = filters.value.status;
-        if (filters.value.product) params.LoanProductId = filters.value.product;
-        if (filters.value.currency) params.CurrencyId = filters.value.currency;
-        if (searchQuery.value) params.Search = searchQuery.value;
-
-        const response = await loansService.getLoans(params);
-
-        if (response?.loans) {
-            loans.value = response.loans;
-            totalLoans.value = response.total;
-            totalPages.value = response.totalPages;
-            pendingLoans.value = loans.value.filter(loan => loan.loanStatusName === 'Pendente').length;
-            approvedLoans.value = loans.value.filter(loan => loan.loanStatusName === 'Aprovado').length;
-            totalAmount.value = loans.value.reduce((sum, loan) => sum + (loan.requestedAmount || 0), 0);
-        } else {
-            loans.value = [];
-            totalLoans.value = 0;
-            totalPages.value = 1;
-            pendingLoans.value = 0;
-            approvedLoans.value = 0;
-            totalAmount.value = 0;
-        }
+        const response = await loansService.getLoans(buildLoanParams(managerId) as any);
+        applyLoanResponse(response);
     } catch (error) {
         console.error('Erro ao filtrar meus clientes:', error);
         await Swal.fire({
@@ -630,232 +666,107 @@ const clearFilters = () => {
         currency: '',
         managerId: getDefaultManagerId()
     };
+    partnerManagerFilter.value = 'all';
+    searchQuery.value = '';
+    currentPage.value = 1;
+    fetchLoans();
+};
+
+const listPendingLoans = () => {
+    filters.value.status = PENDING_STATUS_ID;
+    if (!isRestrictedPartnerView.value) {
+        filters.value.managerId = '';
+    }
+    searchQuery.value = '';
+    currentPage.value = 1;
+    fetchLoans();
+};
+
+const listAllLoans = () => {
+    if (isRestrictedPartnerView.value) return;
+    filters.value.status = '';
+    filters.value.product = '';
+    filters.value.currency = '';
+    filters.value.managerId = '';
     searchQuery.value = '';
     currentPage.value = 1;
     fetchLoans();
 };
 
 const changePage = (page: number) => {
-    if (page >= 1 && page <= totalPages.value) {
+    if (page >= 1 && page <= totalPages.value && page !== currentPage.value) {
         currentPage.value = page;
         fetchLoans();
-    }
-};
-
-const exportLoans = async () => {
-    try {
-        await Swal.fire({
-            title: 'Exportando...',
-            text: 'Preparando dados para exportação',
-            icon: 'info',
-            allowOutsideClick: false,
-            showConfirmButton: false
-        });
-
-        // Implementar exportação
-        await Swal.fire({
-            title: 'Sucesso!',
-            text: 'Dados exportados com sucesso',
-            icon: 'success',
-            confirmButtonColor: '#28a745'
-        });
-    } catch (error) {
-        await Swal.fire({
-            title: 'Erro!',
-            text: 'Erro ao exportar dados',
-            icon: 'error',
-            confirmButtonColor: '#dc3545'
-        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 };
 
 const quickApprove = async (loan: any) => {
-    const { value: stripeAccountId } = await Swal.fire({
-        title: 'Aprovar Empréstimo Manualmente',
-        /* text: 'Por favor, informe o Stripe Account ID para prosseguir com a aprovação:',
-        input: 'text',
-        inputLabel: 'Stripe Account ID',
-        inputPlaceholder: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-        inputValue: '08de0395-27f3-40af-860d-b218143bf0e0',
-        inputValidator: (value) => {
-            if (!value) {
-                return 'Stripe Account ID é obrigatório!';
-            }
-            // Validação básica de UUID
-            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-            if (!uuidRegex.test(value)) {
-                return 'Formato inválido. Use um UUID válido.';
-            }
-            return null;
-        }, */
-        showCancelButton: true,
-        confirmButtonText: 'Continuar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#28a745',
-        cancelButtonColor: '#6c757d',
-        icon: 'question'
-    });
-
-    if (stripeAccountId) {
-        const result = await Swal.fire({
-            title: 'Confirmar Aprovação',
-            text: `Tem certeza que deseja aprovar o empréstimo ${loan.loanNumber} de ${formatCurrency(loan.requestedAmount, loan.currencySymbol, loan.currencyCode)}?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Sim, aprovar!',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#28a745',
-            cancelButtonColor: '#6c757d'
+    try {
+        loading.value = true;
+        await handleApprove(loan, async () => {
+            await router.push(`/loans/view/${loan.id}?tab=envio`);
         });
-
-        if (result.isConfirmed) {
-            try {
-                loading.value = true;
-                await store.approveManual(loan.id, stripeAccountId);
-                await fetchLoans(); // Recarregar dados atualizados
-
-                await Swal.fire({
-                    title: 'Sucesso!',
-                    text: 'Empréstimo aprovado com sucesso!',
-                    icon: 'success',
-                    confirmButtonColor: '#28a745'
-                });
-            } catch (error: any) {
-                console.error('Erro ao aprovar empréstimo:', error);
-                await Swal.fire({
-                    title: 'Erro!',
-                    text: error.message || 'Erro ao aprovar empréstimo. Tente novamente.',
-                    icon: 'error',
-                    confirmButtonColor: '#dc3545'
-                });
-            } finally {
-                loading.value = false;
-            }
-        }
+    } finally {
+        loading.value = false;
     }
 };
 
 const quickReject = async (loan: any) => {
-    const { value: reason } = await Swal.fire({
-        title: 'Rejeitar Empréstimo',
-        text: 'Informe o motivo da rejeição:',
-        input: 'textarea',
-        inputPlaceholder: 'Motivo da rejeição...',
-        inputValidator: (value) => {
-            if (!value) {
-                return 'Motivo é obrigatório!';
-            }
-            return null;
-        },
-        showCancelButton: true,
-        confirmButtonText: 'Continuar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#dc3545',
-        cancelButtonColor: '#6c757d'
-    });
-
-    if (reason) {
-        const result = await Swal.fire({
-            title: 'Confirmar Rejeição',
-            text: `Tem certeza que deseja rejeitar o empréstimo ${loan.loanNumber}?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Sim, rejeitar!',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#dc3545',
-            cancelButtonColor: '#6c757d'
-        });
-
-        if (result.isConfirmed) {
-            try {
-                loading.value = true;
-                // Usando o método approveLoan com approved: false para rejeitar
-                await store.approveLoan(loan.id, {
-                    approved: false,
-                    rejectionReason: reason,
-                    modifiedAmount: loan.requestedAmount,
-                });
-                await fetchLoans(); // Recarregar dados atualizados
-
-                await Swal.fire({
-                    title: 'Sucesso!',
-                    text: 'Empréstimo rejeitado com sucesso!',
-                    icon: 'success',
-                    confirmButtonColor: '#28a745'
-                });
-            } catch (error: any) {
-                console.error('Erro ao rejeitar empréstimo:', error);
-                await Swal.fire({
-                    title: 'Erro!',
-                    text: error.message || 'Erro ao rejeitar empréstimo. Tente novamente.',
-                    icon: 'error',
-                    confirmButtonColor: '#dc3545'
-                });
-            } finally {
-                loading.value = false;
-            }
-        }
+    try {
+        loading.value = true;
+        await handleReject(loan, fetchLoans);
+    } finally {
+        loading.value = false;
     }
 };
 
 const canApproveLoan = (loan: any) => {
-    if (!loan) return false;
-    const status = loan.loanStatusName || loan.status;
-    // Só pode aprovar se estiver pendente
+    const status = loan?.loanStatusName || loan?.status;
     return status === 'PENDING' || status === 'Pendente';
 };
 
 const canRejectLoan = (loan: any) => {
-    if (!loan) return false;
-    const status = loan.loanStatusName || loan.status;
-    // Só pode rejeitar se estiver pendente
+    const status = loan?.loanStatusName || loan?.status;
     return status === 'PENDING' || status === 'Pendente';
 };
 
 const getActionButtonText = (loan: any) => {
-    if (!loan) return '';
-    const status = loan.loanStatusName || loan.status;
-
+    const status = loan?.loanStatusName || loan?.status;
     switch (status) {
-        case 'Aprovado':
-            return 'Já Aprovado';
-        case 'Rejeitado':
-            return 'Rejeitado';
-        case 'Ativo':
-            return 'Em Andamento';
-        case 'Finalizado':
-            return 'Finalizado';
-        case 'Inadimplente':
-            return 'Inadimplente';
-        case 'Reestruturado':
-            return 'Reestruturado';
-        default:
-            return status || 'Status Desconhecido';
+        case 'Aprovado': return 'Já Aprovado';
+        case 'Rejeitado': return 'Rejeitado';
+        case 'Ativo': return 'Em Andamento';
+        case 'Finalizado': return 'Finalizado';
+        case 'Inadimplente': return 'Inadimplente';
+        case 'Reestruturado': return 'Reestruturado';
+        default: return status || 'Status Desconhecido';
     }
 };
 
 const getStatusBadgeClass = (status: string) => {
     switch (status) {
-        case 'Aprovado':
-            return 'badge-outline-success';
-        case 'Pendente':
-            return 'badge-outline-warning';
-        case 'Rejeitado':
-            return 'badge-outline-danger';
-        case 'Ativo':
-            return 'badge-outline-info';
-        case 'Finalizado':
-            return 'badge-outline-secondary';
-        default:
-            return 'badge-outline-info';
+        case 'Aprovado': return 'badge-outline-success';
+        case 'Pendente': return 'badge-outline-warning';
+        case 'Rejeitado': return 'badge-outline-danger';
+        case 'Ativo': return 'badge-outline-info';
+        case 'Finalizado': return 'badge-outline-secondary';
+        default: return 'badge-outline-info';
+    }
+};
+
+const getStatusBorderClass = (status: string) => {
+    switch (status) {
+        case 'Aprovado': return 'border-l-4 border-l-success';
+        case 'Pendente': return 'border-l-4 border-l-warning';
+        case 'Rejeitado': return 'border-l-4 border-l-danger';
+        case 'Ativo': return 'border-l-4 border-l-info';
+        default: return 'border-l-4 border-l-gray-300 dark:border-l-gray-600';
     }
 };
 
 const formatCurrency = (amount: number, currencySymbol?: string, currencyCode?: string) => {
-    if (!amount) {
-        return `${currencySymbol || 'AOA'} 0,00`;
-    }
-
+    if (!amount) return `${currencySymbol || 'AOA'} 0,00`;
     if (currencySymbol && currencyCode) {
         return new Intl.NumberFormat('pt-BR', {
             style: 'currency',
@@ -863,28 +774,17 @@ const formatCurrency = (amount: number, currencySymbol?: string, currencyCode?: 
             currencyDisplay: 'symbol'
         }).format(amount).replace(/^[^\d]*/, currencySymbol + ' ');
     }
-
-    return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'AOA'
-    }).format(amount);
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'AOA' }).format(amount);
 };
 
-const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
-};
+const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('pt-BR');
 
-// Lifecycle
 onMounted(async () => {
-    // Por padrão "Meus Empréstimos" (gestor = user logado) - filtro já inicializado em filters
-    await fetchLoans();
-    await fetchFilterData();
-});
-
-// Watchers
-watch(currentPage, () => {
-    fetchLoans();
+    try {
+        await fetchFilterData();
+        await fetchLoans();
+    } finally {
+        initialLoading.value = false;
+    }
 });
 </script>
-
-

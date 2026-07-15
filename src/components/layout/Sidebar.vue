@@ -53,6 +53,14 @@
                                     </router-link>
                                 </li>
                                 <li class="nav-item">
+                                    <router-link to="/collections" class="group" @click="toggleMobileMenu">
+                                        <div class="flex items-center">
+                                            <icon-dollar-sign class="group-hover:!text-primary shrink-0" />
+                                            <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Cobranças</span>
+                                        </div>
+                                    </router-link>
+                                </li>
+                                <li class="nav-item">
                                     <router-link to="/chat" class="group" @click="toggleMobileMenu">
                                         <div class="flex items-center w-full">
                                             <icon-menu-chat class="group-hover:!text-primary shrink-0" />
@@ -67,7 +75,7 @@
                                     </router-link>
                                 </li>
                                 <li class="nav-item">
-                                    <button type="button" class="nav-link group w-full" @click="activeDropdown === 'loan-config' ? (activeDropdown = '') : (activeDropdown = 'loan-config')">
+                                    <button v-if="isAdmin" type="button" class="nav-link group w-full" @click="activeDropdown === 'loan-config' ? (activeDropdown = '') : (activeDropdown = 'loan-config')">
                                         <div class="flex items-center">
                                             <icon-desktop class="group-hover:!text-primary shrink-0" />
                                             <span class="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Configurações</span>
@@ -101,7 +109,7 @@
                                         </ul>
                                     </vue-collapsible>
                                 </li>
-                                <li class="nav-item">
+                                <li v-if="isAdmin" class="nav-item">
                                     <router-link to="/users" class="group" @click="toggleMobileMenu">
                                         <div class="flex items-center">
                                             <icon-user class="group-hover:!text-primary shrink-0" />
@@ -139,13 +147,14 @@
     import IconCaretDown from '@/components/icon/icon-caret-down.vue';
     import IconUsers from '@/components/icon/icon-users.vue';
     import IconCreditCard from '@/components/icon/icon-credit-card.vue';
+    import IconDollarSign from '@/components/icon/icon-dollar-sign.vue';
     import IconBarChart from '@/components/icon/icon-bar-chart.vue';
     import IconDesktop from '@/components/icon/icon-desktop.vue';
     import IconUser from '@/components/icon/icon-users.vue';
 
     const store = useAppStore();
     const krefasyStore = useKrefasyStore();
-    const { unreadCount } = storeToRefs(krefasyStore);
+    const { unreadCount, isAdmin } = storeToRefs(krefasyStore);
     const activeDropdown = ref('');
 
     onMounted(() => {

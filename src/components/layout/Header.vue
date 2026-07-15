@@ -124,6 +124,16 @@
                                                     {{ userLogin?.user?.name || 'Utilizador' }}
                                                 </h4>
                                                 <span class="text-black/60 dark:text-dark-light/60 block truncate">{{ userLogin?.user?.email || '' }}</span>
+                                                <span class="inline-block mt-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-primary/10 text-primary">
+                                                    {{ primaryRoleLabel }}
+                                                </span>
+                                                <span
+                                                    v-if="permissions.length"
+                                                    class="block mt-1 text-[11px] text-black/50 dark:text-dark-light/50 truncate"
+                                                    :title="permissions.join(', ')"
+                                                >
+                                                    {{ permissions.slice(0, 2).join(', ') }}<template v-if="permissions.length > 2"> +{{ permissions.length - 2 }}</template>
+                                                </span>
                                             </div>
                                         </div>
                                     </li>
@@ -161,12 +171,13 @@
     const krefasyStore = useKrefasyStore();
     const route = useRoute();
     const router = useRouter();
-    const { unreadCount, unreadConversations } = storeToRefs(krefasyStore);
+    const { unreadCount, unreadConversations, primaryRoleLabel } = storeToRefs(krefasyStore);
 
     const DEFAULT_USER_AVATAR = '/assets/images/user-placeholder.svg';
 
     const userLogin = computed(() => authService.getLoginData());
     const userAvatar = computed(() => userLogin.value?.user?.avatar || DEFAULT_USER_AVATAR);
+    const permissions = computed(() => userLogin.value?.user?.permissions ?? []);
 
     const recentUnreadConversations = computed(() => unreadConversations.value.slice(0, 5));
 

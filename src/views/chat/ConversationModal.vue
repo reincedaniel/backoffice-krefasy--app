@@ -133,9 +133,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
+import { storeToRefs } from 'pinia';
 import Swal from 'sweetalert2';
-import { customerService, type Customer } from '@/services/customers.service';
+import { useKrefasyStore } from '@/stores/krefasy.store';
 import { messagesService, type CreateConversationRequest, type Conversation } from '@/services/messages.service';
 
 const props = defineProps<{
@@ -147,6 +148,9 @@ const emit = defineEmits<{
     created: [conversation: Conversation];
 }>();
 
+const store = useKrefasyStore();
+const { clients, clientsLoading } = storeToRefs(store);
+
 const form = ref<CreateConversationRequest>({
     clientId: '',
     subject: '',
@@ -157,8 +161,9 @@ const form = ref<CreateConversationRequest>({
 
 const errors = ref<Record<string, string>>({});
 const loading = ref(false);
-const customersLoading = ref(false);
-const customers = ref<Customer[]>([]);
+
+const customers = computed(() => clients.value);
+const customersLoading = computed(() => clientsLoading.value);
 
 const resetForm = () => {
     form.value = {
@@ -172,19 +177,11 @@ const resetForm = () => {
 };
 
 const loadCustomers = async () => {
-    customersLoading.value = true;
     try {
-        const response = await customerService.getCustomers();
-        if (response.succeeded && response.data) {
-            customers.value = response.data;
-        } else {
-            Swal.fire('Erro', 'Erro ao carregar clientes', 'error');
-        }
+        await store.fetchClients();
     } catch (error) {
         console.error('Erro ao carregar clientes:', error);
         Swal.fire('Erro', 'Erro ao carregar clientes', 'error');
-    } finally {
-        customersLoading.value = false;
     }
 };
 
@@ -243,7 +240,7 @@ const close = () => {
 watch(() => props.show, (visible) => {
     if (visible) {
         resetForm();
-        loadCustomers();
+        void loadCustomers();
     } else {
         loading.value = false;
     }

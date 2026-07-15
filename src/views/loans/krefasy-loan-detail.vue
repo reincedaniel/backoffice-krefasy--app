@@ -1,414 +1,453 @@
 <template>
-    <div>
+    <div class="space-y-5">
         <PageHeader
-            title="Detalhes do Empréstimo"
-            subtitle="Visualize e gerencie todas as informações do empréstimo"
+            :title="loan ? `#${loan.loanNumber || loan.id}` : 'Detalhes do Empréstimo'"
+            :subtitle="loan ? loan.customerName : 'Visualize e gerencie todas as informações do empréstimo'"
             :breadcrumbs="[
                 { label: 'Dashboard', to: '/dashboard' },
                 { label: 'Empréstimos', to: '/loans' },
                 { label: 'Detalhes' },
             ]"
-        />
+        >
+            <template v-if="loan && !loading && !error" #actions>
+                <router-link to="/loans" class="btn btn-outline-secondary btn-sm gap-2">
+                    <icon-arrow-left class="w-4 h-4" />
+                    Voltar
+                </router-link>
+                <button v-if="canApproveLoan" type="button" class="btn btn-success btn-sm gap-2" @click="approveLoan">
+                    <icon-square-check class="w-4 h-4" />
+                    Aprovar
+                </button>
+                <button v-if="canRejectLoan" type="button" class="btn btn-danger btn-sm gap-2" @click="rejectLoan">
+                    <icon-x-circle class="w-4 h-4" />
+                    Rejeitar
+                </button>
+                <button v-if="!canApproveLoan && !canRejectLoan" type="button" class="btn btn-outline-info btn-sm gap-2" disabled>
+                    <icon-square-check class="w-4 h-4" />
+                    {{ getActionButtonText() }}
+                </button>
+                <button
+                    v-if="canContactCustomer"
+                    type="button"
+                    class="btn btn-outline-primary btn-sm gap-2"
+                    :disabled="collectionChatLoading"
+                    @click="openPrimaryCollectionChat"
+                >
+                    <icon-menu-chat class="w-4 h-4" />
+                    Contactar cliente
+                </button>
+            </template>
+        </PageHeader>
 
-        <div>
-            <!-- Loading State -->
-            <div v-if="loading" class="panel">
-                <div class="flex items-center justify-center py-12">
-                    <div class="flex flex-col items-center gap-4">
-                        <span class="animate-spin border-4 border-primary border-l-transparent rounded-full w-10 h-10 inline-block align-middle"></span>
-                        <span class="text-sm text-gray-600 dark:text-gray-300">Carregando detalhes do empréstimo...</span>
+        <div v-if="loading" class="panel">
+            <div class="flex items-center justify-center py-16">
+                <div class="flex flex-col items-center gap-4">
+                    <span class="animate-spin border-4 border-primary border-l-transparent rounded-full w-10 h-10"></span>
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Carregando detalhes do empréstimo...</span>
+                </div>
+            </div>
+        </div>
+
+        <div v-else-if="accessDenied" class="panel">
+            <div class="text-center py-16">
+                <div class="text-red-500 text-lg mb-4">Acesso negado</div>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">
+                    Este empréstimo não está associado ao seu utilizador nem está disponível para atribuição.
+                </p>
+                <router-link to="/loans" class="btn btn-primary">Voltar aos empréstimos</router-link>
+            </div>
+        </div>
+
+        <div v-else-if="error" class="panel">
+            <div class="text-center py-16">
+                <div class="text-red-500 text-lg mb-4">Erro ao carregar empréstimo</div>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">{{ error }}</p>
+                <button @click="loadLoanDetails" class="btn btn-primary">Tentar Novamente</button>
+            </div>
+        </div>
+
+        <template v-else-if="loan">
+            <!-- Hero / resumo -->
+            <div class="panel overflow-hidden relative" :class="getStatusBorderClass(loan.loanStatusName || loan.status)">
+                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge text-sm" :class="getStatusBadgeClass(loan.loanStatusName || loan.status)">
+                                {{ loan.loanStatusName || getStatusLabel(loan.status) }}
+                            </span>
+                            <span v-if="loan.loanProductName" class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ loan.loanProductName }}
+                            </span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+                            {{ formatCurrency(loan.requestedAmount || loan.amount) }}
+                        </h2>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            {{ loan.customerEmail }}
+                            <span v-if="loan.managerName"> · Gestor: {{ loan.managerName }}</span>
+                        </p>
                     </div>
-                </div>
-            </div>
-
-            <!-- Error State -->
-            <div v-else-if="error" class="panel">
-                <div class="text-center py-12">
-                    <div class="text-red-500 text-lg mb-4">Erro ao carregar empréstimo</div>
-                    <p class="text-gray-600 dark:text-gray-400 mb-4">{{ error }}</p>
-                    <button @click="loadLoanDetails" class="btn btn-primary">Tentar Novamente</button>
-                </div>
-            </div>
-
-            <!-- Content -->
-            <div v-else-if="loan">
-                <!-- Action Buttons -->
-                <div class="flex items-center lg:justify-end justify-center flex-wrap gap-4 mb-6">
-                    <button
-                        v-if="loan && canApproveLoan"
-                        type="button"
-                        class="btn btn-success gap-2"
-                        @click="approveLoan"
-                    >
-                        <icon-square-check />
-                        Aprovar
-                    </button>
-
-                    <button
-                        v-if="loan && canRejectLoan"
-                        type="button"
-                        class="btn btn-danger gap-2"
-                        @click="rejectLoan"
-                    >
-                        <icon-x-circle />
-                        Rejeitar
-                    </button>
-
-                    <button
-                        v-if="loan && !canApproveLoan && !canRejectLoan"
-                        type="button"
-                        class="btn btn-info gap-2"
-                        disabled
-                    >
-                        <icon-square-check />
-                        {{ getActionButtonText() }}
-                    </button>
-
-                    <!-- <router-link :to="`/loans/edit/${loan.id}`" class="btn btn-warning gap-2">
-                        <icon-edit />
-                        Editar
-                    </router-link> -->
-
-                    <router-link to="/loans" class="btn btn-secondary gap-2">
-                        <icon-arrow-left />
-                        Voltar
-                    </router-link>
-                </div>
-
-                <!-- Main Panel -->
-                <div class="panel">
-                    <!-- Loan ID and Status Header -->
-                    <div class="flex justify-between items-start px-4 mb-6">
-                        <div>
-                            <h3 class="text-2xl font-bold text-dark dark:text-white-light">
-                                Empréstimo #{{ loan.loanNumber || loan.id }}
-                            </h3>
-                            <p class="text-gray-600 dark:text-gray-400 mt-1">
-                                Cliente: {{ loan.customerName }}
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto lg:min-w-[28rem]">
+                        <div class="rounded-xl bg-gray-50 dark:bg-gray-800/50 px-3 py-2.5">
+                            <p class="text-xs text-gray-500">Aprovado</p>
+                            <p class="text-sm font-bold">
+                                {{ loan.approvedAmount && loan.approvedAmount > 0 ? formatCurrency(loan.approvedAmount) : '—' }}
                             </p>
                         </div>
-                        <div class="flex flex-col items-end gap-2">
-                            <div>
-                                <span class="badge" :class="getStatusBadgeClass(loan.loanStatusName || loan.status)">
-                                    {{ loan.loanStatusName || getStatusLabel(loan.status) }}
-                                </span>
-                            </div>
-                            <div class="text-2xl font-bold text-primary">
-                                {{ formatCurrency(loan.requestedAmount || loan.amount) }}
-                            </div>
+                        <div class="rounded-xl bg-gray-50 dark:bg-gray-800/50 px-3 py-2.5">
+                            <p class="text-xs text-gray-500">Total</p>
+                            <p class="text-sm font-bold text-primary">{{ formatCurrency(loan.totalAmount) }}</p>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 dark:bg-gray-800/50 px-3 py-2.5">
+                            <p class="text-xs text-gray-500">Parcelas</p>
+                            <p class="text-sm font-bold">{{ loan.numberOfInstallments || loan.term || 0 }}×</p>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 dark:bg-gray-800/50 px-3 py-2.5">
+                            <p class="text-xs text-gray-500">Juros</p>
+                            <p class="text-sm font-bold">{{ loan.interestRate }}%</p>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- Tabs -->
-                    <TabGroup as="div">
-                        <TabList class="flex flex-wrap mt-3 border-b border-white-light dark:border-[#191e3a] px-4">
-                            <Tab as="template" v-slot="{ selected }">
-                                <a
-                                    href="javascript:;"
-                                    class="p-3.5 py-2 -mb-[1px] flex items-center border border-transparent hover:text-primary dark:hover:border-b-black !outline-none transition duration-300"
-                                    :class="{ '!border-white-light !border-b-white text-primary dark:!border-[#191e3a] dark:!border-b-black': selected }"
-                                >
-                                    <icon-credit-card class="w-5 h-5 ltr:mr-2 rtl:ml-2" />
+            <!-- Tabs -->
+            <div class="panel !p-0 overflow-hidden">
+                <TabGroup as="div" :selectedIndex="selectedTabIndex" @change="selectedTabIndex = $event">
+                    <div class="px-4 pt-4 pb-0 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/20">
+                        <TabList class="flex flex-wrap gap-2">
+                            <Tab v-slot="{ selected }" as="template">
+                                <button type="button" :class="['tab-pill', selected ? 'tab-pill-active' : 'tab-pill-inactive']">
+                                    <icon-credit-card class="w-4 h-4" />
                                     Produto
-                                </a>
+                                </button>
                             </Tab>
-                            <Tab as="template" v-slot="{ selected }">
-                                <a
-                                    href="javascript:;"
-                                    class="p-3.5 py-2 -mb-[1px] flex items-center border border-transparent hover:text-primary dark:hover:border-b-black !outline-none transition duration-300"
-                                    :class="{ '!border-white-light !border-b-white text-primary dark:!border-[#191e3a] dark:!border-b-black': selected }"
-                                >
-                                    <icon-users class="w-5 h-5 ltr:mr-2 rtl:ml-2" />
+                            <Tab v-slot="{ selected }" as="template">
+                                <button type="button" :class="['tab-pill', selected ? 'tab-pill-active' : 'tab-pill-inactive']">
+                                    <icon-users class="w-4 h-4" />
                                     Cliente
-                                </a>
+                                </button>
                             </Tab>
-                            <Tab as="template" v-slot="{ selected }">
-                                <a
-                                    href="javascript:;"
-                                    class="p-3.5 py-2 -mb-[1px] flex items-center border border-transparent hover:text-primary dark:hover:border-b-black !outline-none transition duration-300"
-                                    :class="{ '!border-white-light !border-b-white text-primary dark:!border-[#191e3a] dark:!border-b-black': selected }"
-                                >
-                                    <icon-list-check class="w-5 h-5 ltr:mr-2 rtl:ml-2" />
+                            <Tab v-slot="{ selected }" as="template">
+                                <button type="button" :class="['tab-pill', selected ? 'tab-pill-active' : 'tab-pill-inactive']">
+                                    <icon-dollar-sign class="w-4 h-4" />
+                                    Envio de Valores
+                                </button>
+                            </Tab>
+                            <Tab v-slot="{ selected }" as="template">
+                                <button type="button" :class="['tab-pill', selected ? 'tab-pill-active' : 'tab-pill-inactive']">
+                                    <icon-list-check class="w-4 h-4" />
                                     Parcelas
-                                </a>
+                                    <span v-if="loan.installments?.length" class="ml-1 text-xs opacity-80">({{ loan.installments.length }})</span>
+                                </button>
                             </Tab>
                         </TabList>
+                    </div>
 
-                        <TabPanels class="pt-5 flex-1">
+                    <TabPanels>
                             <!-- Tab Produto -->
                             <TabPanel>
-                                <div class="p-6 space-y-6">
-                                    <!-- Informações do Produto -->
-                                    <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                        <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
-                                            <icon-credit-card class="w-4 h-4 mr-2" />
+                                <div class="p-5 space-y-5">
+                                    <section class="detail-section">
+                                        <div class="detail-section-header">
+                                            <icon-credit-card class="w-4 h-4" />
                                             Detalhes do Produto
-                                        </h5>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Nome do Produto:</span>
-                                                <span class="font-semibold">{{ loan.loanProductName || 'N/A' }}</span>
+                                        </div>
+                                        <div class="detail-section-body">
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Produto</p>
+                                                <p class="detail-field-value">{{ loan.loanProductName || 'N/A' }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Valor Solicitado:</span>
-                                                <span class="font-semibold text-lg">{{ formatCurrency(loan.requestedAmount || loan.amount) }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Valor Solicitado</p>
+                                                <p class="detail-field-value text-primary">{{ formatCurrency(loan.requestedAmount || loan.amount) }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Valor Aprovado:</span>
-                                                <span class="font-semibold">
-                                                    {{ loan.approvedAmount ? formatCurrency(loan.approvedAmount) : loan.approvedAmount }}
-                                                </span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Valor Aprovado</p>
+                                                <p class="detail-field-value">
+                                                    {{ loan.approvedAmount && loan.approvedAmount > 0 ? formatCurrency(loan.approvedAmount) : 'Aguardando aprovação' }}
+                                                </p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Taxa de Juros:</span>
-                                                <span class="font-semibold">{{ loan.interestRate }}% {{ loan.interestPeriodName || 'ao mês' }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Taxa de Juros</p>
+                                                <p class="detail-field-value">{{ loan.interestRate }}% · {{ loan.interestPeriodName || 'N/A' }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Período de Juros:</span>
-                                                <span class="font-semibold">{{ loan.interestPeriodName || 'N/A' }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Parcelas</p>
+                                                <p class="detail-field-value">{{ loan.numberOfInstallments || loan.term }} × {{ formatCurrency(loan.monthlyPayment) }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Número de Parcelas:</span>
-                                                <span class="font-semibold">{{ loan.numberOfInstallments || loan.term }} parcelas</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Total a Pagar</p>
+                                                <p class="detail-field-value text-primary">{{ formatCurrency(loan.totalAmount) }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Pagamento:</span>
-                                                <span class="font-semibold">{{ formatCurrency(loan.monthlyPayment) }}</span>
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Total a Pagar:</span>
-                                                <span class="font-semibold text-lg text-primary">{{ formatCurrency(loan.totalAmount) }}</span>
-                                            </div>
-                                            <div v-if="loan.currencyName" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Moeda:</span>
-                                                <span class="font-semibold">{{ loan.currencyName }} ({{ loan.currencySymbol || loan.currencyCode }})</span>
+                                            <div v-if="loan.currencyName" class="detail-field">
+                                                <p class="detail-field-label">Moeda</p>
+                                                <p class="detail-field-value">{{ loan.currencyName }} ({{ loan.currencySymbol || loan.currencyCode }})</p>
                                             </div>
                                         </div>
-                                    </div>
+                                    </section>
 
-                                    <!-- Informações de Data -->
-                                    <div class="mt-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                                        <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
-                                            <icon-calendar class="w-4 h-4 mr-2" />
-                                            Datas do Empréstimo
-                                        </h5>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Data de Criação:</span>
-                                                <span class="font-semibold">{{ formatDate(loan.createdAt) }}</span>
+                                    <section class="detail-section">
+                                        <div class="detail-section-header">
+                                            <icon-calendar class="w-4 h-4" />
+                                            Datas
+                                        </div>
+                                        <div class="detail-section-body">
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Criação</p>
+                                                <p class="detail-field-value">{{ formatDate(loan.createdAt) }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Data de Início:</span>
-                                                <span class="font-semibold">{{ loan.startDate ? formatDate(loan.startDate) : 'Não definida' }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Início</p>
+                                                <p class="detail-field-value">{{ loan.startDate ? formatDate(loan.startDate) : 'Não definida' }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Data Final:</span>
-                                                <span class="font-semibold">{{ loan.endDate ? formatDate(loan.endDate) : 'Em andamento' }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Fim</p>
+                                                <p class="detail-field-value">{{ loan.endDate ? formatDate(loan.endDate) : 'Em andamento' }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Última Atualização:</span>
-                                                <span class="font-semibold">{{ loan.updatedAt ? formatDate(loan.updatedAt) : 'N/A' }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Atualização</p>
+                                                <p class="detail-field-value">{{ loan.updatedAt ? formatDate(loan.updatedAt) : 'N/A' }}</p>
                                             </div>
                                         </div>
-                                    </div>
+                                    </section>
 
-                                    <!-- Motivo de Rejeição se aplicável -->
-                                    <div v-if="loan.rejectionReason" class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded">
-                                        <div class="text-white-dark text-sm mb-1">Motivo da Rejeição:</div>
-                                        <div class="text-red-700 dark:text-red-300">{{ loan.rejectionReason }}</div>
+                                    <section v-if="loan.notes" class="detail-section">
+                                        <div class="detail-section-header">
+                                            <icon-file class="w-4 h-4" />
+                                            Observações
+                                        </div>
+                                        <div class="p-5">
+                                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ loan.notes }}</p>
+                                        </div>
+                                    </section>
+
+                                    <div v-if="loan.rejectionReason" class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
+                                        <p class="text-xs font-semibold text-red-600 dark:text-red-400 mb-1">Motivo da Rejeição</p>
+                                        <p class="text-sm text-red-800 dark:text-red-200">{{ loan.rejectionReason }}</p>
                                     </div>
                                 </div>
                             </TabPanel>
 
                             <!-- Tab Cliente -->
                             <TabPanel>
-                                <div class="p-6 space-y-6">
-                                    <!-- Informações Básicas -->
-                                    <div class="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
-                                        <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
-                                            <icon-users class="w-4 h-4 mr-2" />
+                                <div class="p-5 space-y-5">
+                                    <section class="detail-section">
+                                        <div class="detail-section-header">
+                                            <icon-users class="w-4 h-4" />
                                             Informações Básicas
-                                        </h5>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Nome Completo:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails?.fullName || loan.customerName }}</span>
+                                        </div>
+                                        <div class="detail-section-body">
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Nome</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails?.fullName || loan.customerName }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Email:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails?.email || loan.customerEmail }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Email</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails?.email || loan.customerEmail }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Telefone:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails?.phoneNumber || 'N/A' }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Telefone</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails?.phoneNumber || 'N/A' }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Data de Nascimento:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails?.dateOfBirth ? formatDate(loan.customerDetails.dateOfBirth) : 'N/A' }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Nascimento</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails?.dateOfBirth ? formatDate(loan.customerDetails.dateOfBirth) : 'N/A' }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Tipo de Documento:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails?.documentType || 'N/A' }}</span>
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Número do Documento:</span>
-                                                <span class="font-mono text-sm">{{ loan.customerDetails?.documentNumber || 'N/A' }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Documento</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails?.documentType || 'N/A' }} · {{ loan.customerDetails?.documentNumber || 'N/A' }}</p>
                                             </div>
                                         </div>
-                                    </div>
+                                    </section>
 
                                     <!-- Endereço -->
-                                    <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg" v-if="loan.customerDetails && (loan.customerDetails.address || loan.customerDetails.city || loan.customerDetails.state)">
-                                        <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
-                                            <icon-home class="w-4 h-4 mr-2" />
+                                    <section
+                                        v-if="loan.customerDetails && (loan.customerDetails.address || loan.customerDetails.city || loan.customerDetails.state)"
+                                        class="detail-section"
+                                    >
+                                        <div class="detail-section-header">
+                                            <icon-home class="w-4 h-4" />
                                             Endereço Residencial
-                                        </h5>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div v-if="loan.customerDetails.address" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Endereço:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.address }}</span>
+                                        </div>
+                                        <div class="detail-section-body">
+                                            <div v-if="loan.customerDetails.address" class="detail-field sm:col-span-2 lg:col-span-3">
+                                                <p class="detail-field-label">Endereço</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.address }}</p>
                                             </div>
-                                            <div v-if="loan.customerDetails.city" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Cidade:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.city }}</span>
+                                            <div v-if="loan.customerDetails.city" class="detail-field">
+                                                <p class="detail-field-label">Cidade</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.city }}</p>
                                             </div>
-                                            <div v-if="loan.customerDetails.state" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Estado/Província:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.state }}</span>
+                                            <div v-if="loan.customerDetails.state" class="detail-field">
+                                                <p class="detail-field-label">Estado/Província</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.state }}</p>
                                             </div>
-                                            <div v-if="loan.customerDetails.country" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">País:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.country }}</span>
+                                            <div v-if="loan.customerDetails.country" class="detail-field">
+                                                <p class="detail-field-label">País</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.country }}</p>
                                             </div>
-                                            <div v-if="loan.customerDetails.postalCode" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Código Postal:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.postalCode }}</span>
+                                            <div v-if="loan.customerDetails.postalCode" class="detail-field">
+                                                <p class="detail-field-label">Código Postal</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.postalCode }}</p>
                                             </div>
                                         </div>
-                                    </div>
+                                    </section>
 
                                     <!-- Localização GPS -->
-                                    <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg" v-if="loan.customerDetails && hasValidLocation">
-                                        <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
-                                            <icon-map-pin class="w-4 h-4 mr-2" />
+                                    <section v-if="loan.customerDetails && hasValidLocation" class="detail-section">
+                                        <div class="detail-section-header">
+                                            <icon-map-pin class="w-4 h-4" />
                                             Localização GPS
-                                        </h5>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Latitude:</span>
-                                                <span class="font-mono text-sm">{{ loan.customerDetails.realTimeLocationLatitude }}</span>
+                                        </div>
+                                        <div class="detail-section-body">
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Latitude</p>
+                                                <p class="detail-field-value font-mono text-xs">{{ loan.customerDetails.realTimeLocationLatitude }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Longitude:</span>
-                                                <span class="font-mono text-sm">{{ loan.customerDetails.realTimeLocationLongitude }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Longitude</p>
+                                                <p class="detail-field-value font-mono text-xs">{{ loan.customerDetails.realTimeLocationLongitude }}</p>
                                             </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Capturado em:</span>
-                                                <span class="font-semibold">{{ formatDate(loan.customerDetails.locationTimestamp) }}</span>
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Capturado em</p>
+                                                <p class="detail-field-value">{{ formatDate(loan.customerDetails.locationTimestamp) }}</p>
                                             </div>
                                         </div>
-                                        <div class="mt-3">
-                                            <button
-                                                @click="openGoogleMaps"
-                                                class="btn btn-primary btn-sm gap-2 hover:shadow-md transition-shadow"
-                                            >
+                                        <div class="px-5 pb-5">
+                                            <button type="button" class="btn btn-primary btn-sm gap-2" @click="openGoogleMaps">
                                                 <icon-link class="w-4 h-4" />
                                                 Ver no Google Maps
                                             </button>
                                         </div>
-                                    </div>
+                                    </section>
 
                                     <!-- Informações Profissionais -->
-                                    <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg" v-if="loan.customerDetails && (loan.customerDetails.workAddress || loan.customerDetails.companyName)">
-                                        <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
-                                            <icon-square-check class="w-4 h-4 mr-2" />
+                                    <section
+                                        v-if="loan.customerDetails && (loan.customerDetails.workAddress || loan.customerDetails.companyName)"
+                                        class="detail-section"
+                                    >
+                                        <div class="detail-section-header">
+                                            <icon-square-check class="w-4 h-4" />
                                             Informações Profissionais
-                                        </h5>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div v-if="loan.customerDetails.companyName" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Empresa:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.companyName }}</span>
+                                        </div>
+                                        <div class="detail-section-body">
+                                            <div v-if="loan.customerDetails.companyName" class="detail-field">
+                                                <p class="detail-field-label">Empresa</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.companyName }}</p>
                                             </div>
-                                            <div v-if="loan.customerDetails.workAddress" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Endereço de Trabalho:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.workAddress }}</span>
+                                            <div v-if="loan.customerDetails.workAddress" class="detail-field sm:col-span-2">
+                                                <p class="detail-field-label">Endereço de Trabalho</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.workAddress }}</p>
                                             </div>
                                         </div>
-                                    </div>
+                                    </section>
 
                                     <!-- Referências -->
-                                    <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg" v-if="loan.customerDetails && loan.customerDetails.referenceName">
-                                        <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
-                                            <icon-user-plus class="w-4 h-4 mr-2" />
+                                    <section v-if="loan.customerDetails && loan.customerDetails.referenceName" class="detail-section">
+                                        <div class="detail-section-header">
+                                            <icon-user-plus class="w-4 h-4" />
                                             Referências
-                                        </h5>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Nome:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.referenceName }}</span>
+                                        </div>
+                                        <div class="detail-section-body">
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Nome</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.referenceName }}</p>
                                             </div>
-                                            <div v-if="loan.customerDetails.referenceRelationship" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Relacionamento:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.referenceRelationship }}</span>
+                                            <div v-if="loan.customerDetails.referenceRelationship" class="detail-field">
+                                                <p class="detail-field-label">Relacionamento</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.referenceRelationship }}</p>
                                             </div>
-                                            <div v-if="loan.customerDetails.referencePhoneNumber" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Telefone:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.referencePhoneNumber }}</span>
+                                            <div v-if="loan.customerDetails.referencePhoneNumber" class="detail-field">
+                                                <p class="detail-field-label">Telefone</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.referencePhoneNumber }}</p>
                                             </div>
-                                            <div v-if="loan.customerDetails.referenceEmail" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Email:</span>
-                                                <span class="font-semibold">{{ loan.customerDetails.referenceEmail }}</span>
+                                            <div v-if="loan.customerDetails.referenceEmail" class="detail-field">
+                                                <p class="detail-field-label">Email</p>
+                                                <p class="detail-field-value">{{ loan.customerDetails.referenceEmail }}</p>
                                             </div>
                                         </div>
-                                    </div>
+                                    </section>
 
                                     <!-- Redes Sociais -->
-                                    <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg" v-if="loan.customerDetails && (loan.customerDetails.instagram || loan.customerDetails.facebook)">
-                                        <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
-                                            <icon-share class="w-4 h-4 mr-2" />
+                                    <section
+                                        v-if="loan.customerDetails && (loan.customerDetails.instagram || loan.customerDetails.facebook)"
+                                        class="detail-section"
+                                    >
+                                        <div class="detail-section-header">
+                                            <icon-share class="w-4 h-4" />
                                             Redes Sociais
-                                        </h5>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div v-if="loan.customerDetails.instagram" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Instagram:</span>
-                                                <a :href="loan.customerDetails.instagram" target="_blank" class="font-semibold text-primary hover:underline">
+                                        </div>
+                                        <div class="detail-section-body">
+                                            <div v-if="loan.customerDetails.instagram" class="detail-field">
+                                                <p class="detail-field-label">Instagram</p>
+                                                <a :href="loan.customerDetails.instagram" target="_blank" class="detail-field-value text-primary hover:underline break-all">
                                                     {{ loan.customerDetails.instagram }}
                                                 </a>
                                             </div>
-                                            <div v-if="loan.customerDetails.facebook" class="flex items-center gap-2">
-                                                <span class="text-white-dark text-sm">Facebook:</span>
-                                                <a :href="loan.customerDetails.facebook" target="_blank" class="font-semibold text-primary hover:underline">
+                                            <div v-if="loan.customerDetails.facebook" class="detail-field">
+                                                <p class="detail-field-label">Facebook</p>
+                                                <a :href="loan.customerDetails.facebook" target="_blank" class="detail-field-value text-primary hover:underline break-all">
                                                     {{ loan.customerDetails.facebook }}
                                                 </a>
                                             </div>
                                         </div>
+                                    </section>
+
+                                    <!-- Método de pagamento padrão -->
+                                    <section
+                                        v-if="loan.customerDetails?.defaultPaymentMethod"
+                                        class="detail-section !p-0 overflow-hidden"
+                                    >
+                                        <div class="detail-section-header px-5 pt-5 pb-0 border-0">
+                                            <icon-credit-card class="w-4 h-4" />
+                                            Método de Pagamento
+                                        </div>
+                                        <div class="p-5 pt-3">
+                                            <PaymentMethodCard :payment-method="loan.customerDetails.defaultPaymentMethod" />
+                                        </div>
+                                    </section>
+
+                                    <!-- Link para envio de valores -->
+                                    <div class="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                        <div>
+                                            <h5 class="font-semibold text-gray-800 dark:text-gray-200">Envio de Valores</h5>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                Método de pagamento e valor a transferir ao cliente.
+                                            </p>
+                                        </div>
+                                        <button type="button" class="btn btn-primary btn-sm gap-2 shrink-0" @click="selectedTabIndex = LOAN_TAB.ENVIO">
+                                            <icon-dollar-sign class="w-4 h-4" />
+                                            Ver dados de envio
+                                        </button>
                                     </div>
 
                                     <!-- Gerente Responsável -->
-                                    <div v-if="loan.managerName" class="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg">
-                                        <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-3 flex items-center">
-                                            <icon-checks class="w-4 h-4 mr-2" />
+                                    <section v-if="loan.managerName" class="detail-section">
+                                        <div class="detail-section-header">
+                                            <icon-checks class="w-4 h-4" />
                                             Gerenciamento
-                                        </h5>
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-white-dark text-sm">Gerente Responsável:</span>
-                                            <span class="font-semibold">{{ loan.managerName }}</span>
                                         </div>
-                                    </div>
+                                        <div class="detail-section-body">
+                                            <div class="detail-field">
+                                                <p class="detail-field-label">Gerente Responsável</p>
+                                                <p class="detail-field-value">{{ loan.managerName }}</p>
+                                            </div>
+                                        </div>
+                                    </section>
 
                                     <!-- Documentos do Cliente -->
-                                    <div v-if="loan.customerDetails?.documents && loan.customerDetails.documents.length > 0" class="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
-                                        <h5 class="font-medium text-gray-800 dark:text-gray-200 mb-4 flex items-center">
-                                            <icon-file class="w-4 h-4 mr-2" />
+                                    <section v-if="loan.customerDetails?.documents && loan.customerDetails.documents.length > 0" class="detail-section">
+                                        <div class="detail-section-header">
+                                            <icon-file class="w-4 h-4" />
                                             Documentos do Cliente
-                                        </h5>
-
+                                        </div>
+                                        <div class="p-5 space-y-4">
                                         <!-- Organizar documentos por tipo -->
                                         <div v-for="(docGroup, docType) in groupedDocuments" :key="docType" class="mb-4">
                                             <h6 class="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">{{ docType }}</h6>
                                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                                 <div v-for="doc in docGroup" :key="doc.id"
-                                                     class="flex flex-col justify-between p-3 bg-white dark:bg-gray-700 rounded border hover:shadow-md transition-shadow">
+                                                     class="flex flex-col justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:shadow-md transition-shadow">
                                                     <div class="flex-1 mb-2">
                                                         <div class="font-medium text-sm truncate" :title="doc.originalFileName">
                                                             {{ doc.originalFileName }}
@@ -437,37 +476,39 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+                                        </div>
+                                    </section>
                                 </div>
+                            </TabPanel>
+
+                            <!-- Tab Envio de Valores -->
+                            <TabPanel>
+                                <LoanDisbursementPanel
+                                    v-if="loan"
+                                    :loan="loan"
+                                    :payment-method="loan.customerDetails?.defaultPaymentMethod"
+                                    :format-currency="formatCurrency"
+                                />
                             </TabPanel>
 
                             <!-- Tab Parcelas -->
                             <TabPanel>
-                                <div class="p-6">
-                                    <!-- Cronograma de Parcelas -->
+                                <div class="p-5 space-y-5">
                                     <div v-if="loan.installments && loan.installments.length > 0">
-                                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                                            <h4 class="font-medium text-gray-800 dark:text-gray-200 flex items-center">
-                                                <icon-list-check class="w-5 h-5 mr-2" />
+                                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+                                            <h4 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                                <icon-list-check class="w-5 h-5" />
                                                 Cronograma de Parcelas
                                             </h4>
-                                            <!-- Filtros -->
                                             <div class="flex flex-wrap gap-2 items-center">
-                                                <span class="text-sm text-white-dark">Filtrar:</span>
-                                                <select
-                                                    v-model="installmentFilter"
-                                                    class="form-select form-select-sm w-auto min-w-[140px]"
-                                                >
+                                                <select v-model="installmentFilter" class="form-select form-select-sm w-auto min-w-[140px]">
                                                     <option value="all">Todas</option>
                                                     <option value="paid">Pagas</option>
                                                     <option value="unpaid">Não pagas</option>
                                                     <option value="overdue">Em atraso</option>
-                                                    <option value="pending">Pendentes (não atrasadas)</option>
+                                                    <option value="pending">Pendentes</option>
                                                 </select>
-                                                <select
-                                                    v-model="installmentSortBy"
-                                                    class="form-select form-select-sm w-auto min-w-[130px]"
-                                                >
+                                                <select v-model="installmentSortBy" class="form-select form-select-sm w-auto min-w-[130px]">
                                                     <option value="number">Por número</option>
                                                     <option value="dueDate">Por vencimento</option>
                                                     <option value="amount">Por valor (maior)</option>
@@ -476,32 +517,39 @@
                                             </div>
                                         </div>
 
-                                        <!-- Resumo das parcelas -->
-                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                                            <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                                                <div class="text-xs text-white-dark">Total</div>
-                                                <div class="font-semibold">{{ loan.installments.length }} parcelas</div>
+                                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+                                            <div class="rounded-xl bg-gray-50 dark:bg-gray-800/50 px-3 py-2.5">
+                                                <p class="text-xs text-gray-500">Total</p>
+                                                <p class="text-sm font-bold">{{ loan.installments.length }} parcelas</p>
                                             </div>
-                                            <div class="p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
-                                                <div class="text-xs text-white-dark">Pagas</div>
-                                                <div class="font-semibold text-green-700 dark:text-green-300">{{ paidInstallmentsCount }}</div>
+                                            <div class="rounded-xl bg-green-50 dark:bg-green-900/20 px-3 py-2.5">
+                                                <p class="text-xs text-gray-500">Pagas</p>
+                                                <p class="text-sm font-bold text-green-700 dark:text-green-300">{{ paidInstallmentsCount }}</p>
                                             </div>
-                                            <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20">
-                                                <div class="text-xs text-white-dark">Pendentes</div>
-                                                <div class="font-semibold text-amber-700 dark:text-amber-300">{{ pendingInstallmentsCount }}</div>
+                                            <div class="rounded-xl bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
+                                                <p class="text-xs text-gray-500">Pendentes</p>
+                                                <p class="text-sm font-bold text-amber-700 dark:text-amber-300">{{ pendingInstallmentsCount }}</p>
                                             </div>
-                                            <div class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20">
-                                                <div class="text-xs text-white-dark">Em atraso</div>
-                                                <div class="font-semibold text-red-700 dark:text-red-300">{{ overdueInstallmentsCount }}</div>
+                                            <div class="rounded-xl bg-red-50 dark:bg-red-900/20 px-3 py-2.5">
+                                                <p class="text-xs text-gray-500">Em atraso</p>
+                                                <p class="text-sm font-bold text-red-700 dark:text-red-300">{{ overdueInstallmentsCount }}</p>
+                                            </div>
+                                            <div class="rounded-xl bg-red-100 dark:bg-red-900/30 px-3 py-2.5 sm:col-span-1 col-span-2">
+                                                <p class="text-xs text-gray-500">Total em atraso (com mora)</p>
+                                                <p class="text-sm font-bold text-red-800 dark:text-red-200">{{ formatCurrency(overdueTotalDueAmount) }}</p>
                                             </div>
                                         </div>
 
-                                        <div class="overflow-x-auto">
+                                        <div class="detail-section overflow-hidden">
+                                            <div class="overflow-x-auto">
                                             <table class="table w-full">
                                                 <thead>
                                                     <tr>
                                                         <th>Parcela</th>
                                                         <th>Valor</th>
+                                                        <th>Dias</th>
+                                                        <th>Mora</th>
+                                                        <th>Total a pagar</th>
                                                         <th>Data Venc.</th>
                                                         <th>Data Pagamento</th>
                                                         <th>Valor Pago</th>
@@ -522,6 +570,21 @@
                                                             </span>
                                                         </td>
                                                         <td class="font-semibold">{{ formatCurrency(installment.amount) }}</td>
+                                                        <td>
+                                                            <span v-if="getInstallmentLateSummary(installment).daysOverdue > 0" class="text-red-600 dark:text-red-400 font-medium">
+                                                                {{ getInstallmentLateSummary(installment).daysOverdue }}
+                                                            </span>
+                                                            <span v-else class="text-white-dark">—</span>
+                                                        </td>
+                                                        <td>
+                                                            <span v-if="getInstallmentLateSummary(installment).lateInterest > 0" class="text-red-600 dark:text-red-400 font-medium">
+                                                                + {{ formatCurrency(getInstallmentLateSummary(installment).lateInterest) }}
+                                                            </span>
+                                                            <span v-else class="text-white-dark">—</span>
+                                                        </td>
+                                                        <td class="font-bold" :class="getInstallmentLateSummary(installment).isOverdue ? 'text-red-700 dark:text-red-300' : ''">
+                                                            {{ formatCurrency(getInstallmentLateSummary(installment).totalDue) }}
+                                                        </td>
                                                         <td>{{ formatDate(installment.dueDate) }}</td>
                                                         <td>
                                                             <span v-if="installment.paidDate">{{ formatDate(installment.paidDate) }}</span>
@@ -579,7 +642,7 @@
                                                                     >
                                                                         Pagar
                                                                     </a>
-                                                                    <!-- <button
+                                                                    <button
                                                                         type="button"
                                                                         class="btn btn-outline-success btn-sm gap-1"
                                                                         title="Marcar como paga (manual)"
@@ -587,7 +650,17 @@
                                                                     >
                                                                         <icon-square-check class="w-4 h-4" />
                                                                         Marcar como paga
-                                                                    </button> -->
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        class="btn btn-outline-secondary btn-sm gap-1"
+                                                                        title="Contactar no chat"
+                                                                        :disabled="collectionChatLoading"
+                                                                        @click="openInstallmentCollectionChat(installment)"
+                                                                    >
+                                                                        <icon-menu-chat class="w-4 h-4" />
+                                                                        Cobrar
+                                                                    </button>
                                                                 </template>
                                                                 <span v-if="!canViewComprovativo(installment) && installment.isPaid" class="text-white-dark">—</span>
                                                             </div>
@@ -595,15 +668,14 @@
                                                     </tr>
                                                 </tbody>
                                             </table>
+                                            </div>
                                         </div>
 
-                                        <!-- Mensagem quando filtro não retorna resultados -->
-                                        <div v-if="filteredInstallments.length === 0" class="text-center py-8 text-white-dark">
+                                        <div v-if="filteredInstallments.length === 0" class="text-center py-8 text-gray-500">
                                             Nenhuma parcela encontrada com os filtros selecionados.
                                         </div>
                                     </div>
 
-                                    <!-- Mensagem quando não há parcelas -->
                                     <div v-else class="flex flex-col items-center justify-center py-16 text-center">
                                         <div class="w-16 h-16 mb-4 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                                             <icon-list-check class="w-8 h-8 text-gray-400 dark:text-gray-500" />
@@ -621,8 +693,7 @@
                         </TabPanels>
                     </TabGroup>
                 </div>
-            </div>
-        </div>
+        </template>
 
         <!-- Modal Ver Comprovativo -->
         <Teleport to="body">
@@ -718,6 +789,13 @@
                                             Sem comprovativo disponível para pré-visualizar.
                                         </div>
                                     </template>
+                                    <InstallmentPaymentSummary
+                                        v-if="selectedProofInstallment"
+                                        :installment="selectedProofInstallment"
+                                        :currency-code="loan?.currencyCode"
+                                        :format-currency="formatCurrency"
+                                        class="mb-2"
+                                    />
                                     <div class="border-t border-white-dark/20 pt-4">
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Decisão do comprovativo</label>
                                         <div class="flex gap-3 mb-3">
@@ -756,6 +834,12 @@
                                                 min="0"
                                                 class="form-input w-full"
                                             />
+                                            <p
+                                                v-if="selectedProofInstallment && proofForm.paidAmount < getInstallmentLateSummary(selectedProofInstallment).totalDue"
+                                                class="text-xs text-amber-600 dark:text-amber-400 mt-1"
+                                            >
+                                                Valor inferior ao total com mora ({{ formatCurrency(getInstallmentLateSummary(selectedProofInstallment).totalDue) }}).
+                                            </p>
                                         </div>
                                     </div>
                                     <div class="flex justify-end gap-2 pt-2">
@@ -820,9 +904,12 @@
                                     </button>
                                 </div>
                                 <div class="p-5 space-y-4">
-                                    <p class="text-sm text-white-dark">
-                                        Valor da parcela: <strong>{{ selectedMarkPaidInstallment ? formatCurrency(selectedMarkPaidInstallment.amount) : '' }}</strong>
-                                    </p>
+                                    <InstallmentPaymentSummary
+                                        v-if="selectedMarkPaidInstallment"
+                                        :installment="selectedMarkPaidInstallment"
+                                        :currency-code="loan?.currencyCode"
+                                        :format-currency="formatCurrency"
+                                    />
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data do pagamento *</label>
                                         <input v-model="markPaidForm.paidDate" type="date" class="form-input w-full" />
@@ -871,6 +958,13 @@
 
 <script lang="ts" setup>
 import PageHeader from '@/components/layout/PageHeader.vue';
+import LoanDisbursementPanel from '@/components/loans/LoanDisbursementPanel.vue';
+import PaymentMethodCard from '@/components/loans/PaymentMethodCard.vue';
+import InstallmentPaymentSummary from '@/components/loans/InstallmentPaymentSummary.vue';
+import { calculateLateInterest } from '@/utils/late-interest.utils';
+import { resolveCollectionStatusFromLate, type CollectionChatContext } from '@/utils/collection-chat.utils';
+import { useCollectionChat } from '@/composables/use-collection-chat';
+import { usePartnerScope } from '@/composables/use-partner-scope';
 import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useMeta } from '@/composables/use-meta';
@@ -897,13 +991,19 @@ import IconChecks from '@/components/icon/icon-checks.vue';
 import IconFile from '@/components/icon/icon-file.vue';
 import IconMapPin from '@/components/icon/icon-map-pin.vue';
 import IconLink from '@/components/icon/icon-link.vue';
+import IconDollarSign from '@/components/icon/icon-dollar-sign.vue';
 import IconX from '@/components/icon/icon-x.vue';
+import IconMenuChat from '@/components/icon/menu/icon-menu-chat.vue';
 import { parcelsService } from '@/services/parcels.service';
 import {
     getInstallmentPaymentReceipts,
     reviewInstallmentPayment,
     type InstallmentPaymentReceipt,
 } from '@/services/installment-payments.service';
+import { useLoanDecisionDialogs } from '@/composables/use-loan-decision-dialogs';
+import {
+    type CustomerPaymentMethod,
+} from '@/utils/payment-method.utils';
 
 // Definir interfaces para a nova estrutura da API
 interface CustomerDetails {
@@ -934,6 +1034,7 @@ interface CustomerDetails {
     facebook: string;
     createdAt: string;
     documents: Document[];
+    defaultPaymentMethod?: CustomerPaymentMethod | null;
 }
 
 interface Document {
@@ -986,8 +1087,6 @@ interface ExtendedLoan extends Loan {
     interestPeriodName?: string;
     loanStatusId?: string;
     loanStatusName?: string;
-    customerId?: string;
-    managerId?: string | null;
     managerName?: string;
     requestedAmount?: number;
     approvedAmount?: number;
@@ -1006,12 +1105,24 @@ interface ExtendedLoan extends Loan {
 
 useMeta({ title: 'Detalhes do Empréstimo' });
 
+const LOAN_TAB = {
+    PRODUTO: 0,
+    CLIENTE: 1,
+    ENVIO: 2,
+    PARCELAS: 3,
+} as const;
+
 const route = useRoute();
 const store = useKrefasyStore();
+const { handleApprove, handleReject } = useLoanDecisionDialogs();
+const { loading: collectionChatLoading, openCollectionChat } = useCollectionChat();
+const { canAccessLoan } = usePartnerScope();
 
 const loan = ref<ExtendedLoan | null>(null);
 const loading = ref(false);
 const error = ref('');
+const accessDenied = ref(false);
+const selectedTabIndex = ref<number>(LOAN_TAB.PRODUTO);
 const installmentFilter = ref<'all' | 'paid' | 'unpaid' | 'overdue' | 'pending'>('all');
 const installmentSortBy = ref<'number' | 'dueDate' | 'amount' | 'amount-asc'>('number');
 
@@ -1077,7 +1188,7 @@ const hasValidLocation = computed(() => {
            !isNaN(loan.value?.customerDetails?.realTimeLocationLongitude);
 });
 
-// Installments computed
+
 const paidInstallmentsCount = computed(() => {
     const installments = loan.value?.installments as Installment[] | undefined;
     if (!installments) return 0;
@@ -1093,8 +1204,65 @@ const pendingInstallmentsCount = computed(() => {
 const overdueInstallmentsCount = computed(() => {
     const installments = loan.value?.installments as Installment[] | undefined;
     if (!installments) return 0;
-    return installments.filter((i) => i.isOverdue).length;
+    return installments.filter((i) => !i.isPaid && getInstallmentLateSummary(i).isOverdue).length;
 });
+
+const overdueTotalDueAmount = computed(() => {
+    const installments = loan.value?.installments as Installment[] | undefined;
+    if (!installments) return 0;
+    return installments.reduce((sum, inst) => {
+        const late = getInstallmentLateSummary(inst);
+        return late.isOverdue ? sum + late.totalDue : sum;
+    }, 0);
+});
+
+function getInstallmentLateSummary(installment: Installment) {
+    return calculateLateInterest(installment, loan.value?.currencyCode || 'AOA');
+}
+
+const canContactCustomer = computed(() => {
+    const clientId = loan.value?.customerDetails?.id || loan.value?.customerId;
+    const unpaid = (loan.value?.installments as Installment[] | undefined)?.some((i) => !i.isPaid);
+    return Boolean(clientId && unpaid);
+});
+
+function buildInstallmentChatContext(installment: Installment): CollectionChatContext {
+    const late = getInstallmentLateSummary(installment);
+    return {
+        clientId: loan.value?.customerDetails?.id || loan.value?.customerId || '',
+        clientName: loan.value?.customerName || loan.value?.customerDetails?.fullName || 'Cliente',
+        loanId: loan.value?.id || '',
+        loanNumber: loan.value?.loanNumber,
+        installmentNumber: installment.installmentNumber,
+        dueDate: installment.dueDate,
+        amount: installment.amount,
+        lateInterest: late.lateInterest,
+        totalDue: late.totalDue,
+        daysOverdue: late.daysOverdue,
+        isOverdue: late.isOverdue,
+        collectionStatus: resolveCollectionStatusFromLate(late.daysOverdue, installment.dueDate),
+        currencyCode: loan.value?.currencyCode,
+        currencySymbol: loan.value?.currencySymbol,
+    };
+}
+
+function openInstallmentCollectionChat(installment: Installment) {
+    void openCollectionChat(buildInstallmentChatContext(installment));
+}
+
+function openPrimaryCollectionChat() {
+    const installments = (loan.value?.installments as Installment[] | undefined) || [];
+    const unpaid = installments.filter((i) => !i.isPaid);
+    if (unpaid.length === 0) return;
+
+    const overdue = unpaid.filter((i) => getInstallmentLateSummary(i).isOverdue);
+    const candidates = overdue.length > 0 ? overdue : unpaid;
+    const next = [...candidates].sort(
+        (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+    )[0];
+
+    openInstallmentCollectionChat(next);
+}
 
 /** Compara rótulos como "Em Análise", "Em analise", "Emanalise", UNDER_REVIEW */
 function normalizeInstallmentStatusKey(raw: string): string {
@@ -1279,9 +1447,15 @@ const loadLoanDetails = async () => {
     try {
         loading.value = true;
         error.value = '';
+        accessDenied.value = false;
         const loanId = route.params.id as string;
 
         const loanData = await store.fetchLoanById(loanId);
+        if (!canAccessLoan(loanData as ExtendedLoan)) {
+            loan.value = null;
+            accessDenied.value = true;
+            return;
+        }
         loan.value = loanData;
     } catch (err: any) {
         error.value = err.message || 'Erro ao carregar detalhes do empréstimo';
@@ -1293,20 +1467,45 @@ const loadLoanDetails = async () => {
 
 const getStatusBadgeClass = (status: string) => {
     switch (status) {
+        case 'Aprovado':
         case 'APPROVED':
             return 'badge-outline-success';
+        case 'Pendente':
         case 'PENDING':
             return 'badge-outline-warning';
+        case 'Rejeitado':
         case 'REJECTED':
             return 'badge-outline-danger';
+        case 'Ativo':
         case 'ACTIVE':
             return 'badge-outline-info';
+        case 'Finalizado':
         case 'COMPLETED':
             return 'badge-outline-dark';
         case 'DEFAULTED':
+        case 'Inadimplente':
             return 'badge-outline-danger';
         default:
             return 'badge-outline-secondary';
+    }
+};
+
+const getStatusBorderClass = (status: string) => {
+    switch (status) {
+        case 'Aprovado':
+        case 'APPROVED':
+            return 'border-l-4 border-l-success';
+        case 'Pendente':
+        case 'PENDING':
+            return 'border-l-4 border-l-warning';
+        case 'Rejeitado':
+        case 'REJECTED':
+            return 'border-l-4 border-l-danger';
+        case 'Ativo':
+        case 'ACTIVE':
+            return 'border-l-4 border-l-info';
+        default:
+            return 'border-l-4 border-l-gray-300 dark:border-l-gray-600';
     }
 };
 
@@ -1408,7 +1607,7 @@ const openProofModal = async (installment: Installment) => {
     proofForm.value = {
         accepted: existing ? existing.accepted : (installment.proofAccepted ?? null),
         description: existing?.description ?? installment.proofRejectedReason ?? '',
-        paidAmount: installment.amount,
+        paidAmount: getInstallmentLateSummary(installment).totalDue,
     };
     showProofModal.value = true;
 
@@ -1446,6 +1645,23 @@ const saveProofAcceptance = async () => {
     if (proofForm.value.accepted === null) return;
     if (proofReviewBlockedNoDocument.value) return;
 
+    if (proofForm.value.accepted === true) {
+        const totalDue = getInstallmentLateSummary(selectedProofInstallment.value).totalDue;
+        const paidAmount = Number(proofForm.value.paidAmount) || 0;
+        if (paidAmount < totalDue) {
+            const confirm = await Swal.fire({
+                title: 'Valor inferior ao total',
+                html: `O valor reconhecido (${formatCurrency(paidAmount)}) é inferior ao total com mora (${formatCurrency(totalDue)}). Deseja continuar mesmo assim?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Continuar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#dc3545',
+            });
+            if (!confirm.isConfirmed) return;
+        }
+    }
+
     const instId = selectedProofInstallment.value.id;
     proofSubmitting.value = true;
     try {
@@ -1481,7 +1697,7 @@ const openMarkPaidModal = (installment: Installment) => {
     const today = new Date().toISOString().slice(0, 10);
     markPaidForm.value = {
         paidDate: today,
-        amount: installment.amount,
+        amount: getInstallmentLateSummary(installment).totalDue,
         paymentMethod: '',
         reference: `Pagamento manual em ${today}`
     };
@@ -1497,6 +1713,21 @@ const closeMarkPaidModal = () => {
 const submitMarkAsPaid = async () => {
     const inst = selectedMarkPaidInstallment.value;
     if (!inst || !markPaidForm.value.paidDate || !markPaidForm.value.amount || !markPaidForm.value.paymentMethod) return;
+
+    const totalDue = getInstallmentLateSummary(inst).totalDue;
+    if (markPaidForm.value.amount < totalDue) {
+        const confirm = await Swal.fire({
+            title: 'Valor inferior ao total',
+            html: `O valor pago (${formatCurrency(markPaidForm.value.amount)}) é inferior ao total com mora (${formatCurrency(totalDue)}). Deseja continuar?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Continuar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#dc3545',
+        });
+        if (!confirm.isConfirmed) return;
+    }
+
     markPaidSaving.value = true;
     try {
         await parcelsService.markAsPaid(inst.id, {
@@ -1549,89 +1780,25 @@ const formatCurrency = (amount: number) => {
 const approveLoan = async () => {
     if (!loan.value) return;
 
-    const { value: stripeAccountId } = await Swal.fire({
-        title: 'Aprovar Empréstimo Manualmente',
-        /* text: 'Por favor, informe o Stripe Account ID para prosseguir com a aprovação:',
-        input: 'text',
-        inputLabel: 'Stripe Account ID',
-        inputPlaceholder: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-        inputValue: '08de0395-27f3-40af-860d-b218143bf0e0',
-        inputValidator: (value) => {
-            if (!value) {
-                return 'Stripe Account ID é obrigatório!';
-            }
-            // Validação básica de UUID
-            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-            if (!uuidRegex.test(value)) {
-                return 'Formato inválido. Use um UUID válido.';
-            }
-            return null;
-        }, */
-        showCancelButton: true,
-        confirmButtonText: 'Aprovar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#28a745',
-        cancelButtonColor: '#6c757d',
-        icon: 'question'
-    });
-
-    if (stripeAccountId) {
-        const result = await Swal.fire({
-            title: 'Confirmar Aprovação',
-            text: `Tem certeza que deseja aprovar este empréstimo de ${formatCurrency(loan.value.requestedAmount || loan.value.amount)}?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Sim, aprovar!',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#28a745',
-            cancelButtonColor: '#6c757d'
+    try {
+        loading.value = true;
+        await handleApprove(loan.value, async () => {
+            await loadLoanDetails();
+            selectedTabIndex.value = LOAN_TAB.ENVIO;
         });
-
-        if (result.isConfirmed) {
-            try {
-                loading.value = true;
-                await store.approveManual(loan.value.id, stripeAccountId);
-                await loadLoanDetails(); // Recarregar dados atualizados
-
-                await Swal.fire({
-                    title: 'Sucesso!',
-                    text: 'Empréstimo aprovado com sucesso!',
-                    icon: 'success',
-                    confirmButtonColor: '#28a745'
-                });
-            } catch (err: any) {
-                await Swal.fire({
-                    title: 'Erro!',
-                    text: 'Erro ao aprovar empréstimo: ' + (err.message || 'Erro desconhecido'),
-                    icon: 'error',
-                    confirmButtonColor: '#dc3545'
-                });
-            } finally {
-                loading.value = false;
-            }
-        }
+    } finally {
+        loading.value = false;
     }
 };
 
 const rejectLoan = async () => {
     if (!loan.value) return;
 
-    const reason = prompt('Por favor, informe o motivo da rejeição:');
-    if (reason && confirm('Tem certeza que deseja rejeitar este empréstimo?')) {
-        try {
-            loading.value = true;
-            // Por enquanto usando approveLoan com approved: false até o método rejectLoan ser implementado na store
-            await store.approveLoan(loan.value.id, {
-                approved: false,
-                rejectionReason: reason,
-                modifiedAmount: loan.value.amount,
-            });
-            await loadLoanDetails(); // Recarregar dados atualizados
-        } catch (err: any) {
-            alert('Erro ao rejeitar empréstimo: ' + (err.message || 'Erro desconhecido'));
-        } finally {
-            loading.value = false;
-        }
+    try {
+        loading.value = true;
+        await handleReject(loan.value, loadLoanDetails);
+    } finally {
+        loading.value = false;
     }
 };
 
@@ -1708,6 +1875,39 @@ const openGoogleMaps = () => {
 };
 
 onMounted(() => {
+    if (route.query.tab === 'envio') {
+        selectedTabIndex.value = LOAN_TAB.ENVIO;
+    }
     loadLoanDetails();
 });
 </script>
+
+<style scoped>
+.tab-pill {
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 outline-none;
+}
+.tab-pill-active {
+    @apply bg-primary text-white shadow-sm;
+}
+.tab-pill-inactive {
+    @apply text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800;
+}
+.detail-section {
+    @apply rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/20 overflow-hidden;
+}
+.detail-section-header {
+    @apply px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/40 flex items-center gap-2 font-semibold text-gray-800 dark:text-gray-200;
+}
+.detail-section-body {
+    @apply p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3;
+}
+.detail-field {
+    @apply rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2.5;
+}
+.detail-field-label {
+    @apply text-xs text-gray-500 dark:text-gray-400 mb-0.5;
+}
+.detail-field-value {
+    @apply text-sm font-semibold text-gray-900 dark:text-gray-100 break-all;
+}
+</style>

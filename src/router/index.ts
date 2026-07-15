@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 import { useAppStore } from '@/stores/index';
 import appSetting from '@/app-setting';
+import { authService } from '@/services/auth.service';
 
 const routes: RouteRecordRaw[] = [
     // dashboard
@@ -51,7 +52,7 @@ const routes: RouteRecordRaw[] = [
         path: '/users',
         name: 'users',
         component: () => import(/* webpackChunkName: "users" */ '../views/users/index.vue'),
-        meta: { requiresAuth: true, layout: 'app', title: 'Utilizadores' }
+        meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Utilizadores' }
     },
     // Clients (legacy - manter por compatibilidade)
     {
@@ -97,6 +98,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, layout: 'app', title: 'Empréstimos Pendentes' }
     },
     {
+        path: '/collections',
+        name: 'krefasy-collections',
+        component: () => import(/* webpackChunkName: "krefasy-collections" */ '../views/collections/krefasy-collections.vue'),
+        meta: { requiresAuth: true, layout: 'app', title: 'Cobranças' }
+    },
+    {
         path: '/parcels',
         name: 'krefasy-parcels',
         component: () => import(/* webpackChunkName: "krefasy-parcels" */ '../views/parcels/krefasy-parcels.vue'),
@@ -104,9 +111,7 @@ const routes: RouteRecordRaw[] = [
     },
     {
         path: '/parcels/overdue',
-        name: 'krefasy-parcels-overdue',
-        component: () => import(/* webpackChunkName: "krefasy-parcels-overdue" */ '../views/parcels/krefasy-parcels-overdue.vue'),
-        meta: { requiresAuth: true, layout: 'app', title: 'Parcelas Vencidas' }
+        redirect: { path: '/collections', query: { dueFilter: 'overdue' } },
     },
     {
         path: '/parcels/:id',
@@ -130,67 +135,67 @@ const routes: RouteRecordRaw[] = [
         path: '/settings',
         name: 'krefasy-settings',
         component: () => import(/* webpackChunkName: "krefasy-settings" */ '../views/settings/krefasy-settings.vue'),
-        meta: { requiresAuth: true, layout: 'app', title: 'Configurações' }
+        meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Configurações' }
     },
     {
         path: '/currencies',
         name: 'currencies',
         component: () => import(/* webpackChunkName: "currencies" */ '../views/currencies/index.vue'),
-        meta: { requiresAuth: true, layout: 'app', title: 'Moedas' }
+        meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Moedas' }
     },
         {
             path: '/currencies/:id',
             name: 'currency-detail',
             component: () => import(/* webpackChunkName: "currency-detail" */ '../views/currencies/detail.vue'),
-            meta: { requiresAuth: true, layout: 'app', title: 'Detalhe da Moeda' }
+            meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Detalhe da Moeda' }
         },
         // Configurações de Empréstimos
         {
             path: '/interest-periods',
             name: 'interest-periods',
             component: () => import(/* webpackChunkName: "interest-periods" */ '../views/interest-periods/index.vue'),
-            meta: { requiresAuth: true, layout: 'app', title: 'Períodos de Juros' }
+            meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Períodos de Juros' }
         },
         {
             path: '/loan-status',
             name: 'loan-status',
             component: () => import(/* webpackChunkName: "loan-status" */ '../views/loan-status/index.vue'),
-            meta: { requiresAuth: true, layout: 'app', title: 'Status de Empréstimos' }
+            meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Status de Empréstimos' }
         },
         {
             path: '/payment-method-types',
             name: 'payment-method-types',
             component: () => import(/* webpackChunkName: "payment-method-types" */ '../views/payment-method-types/index.vue'),
-            meta: { requiresAuth: true, layout: 'app', title: 'Métodos de Pagamento' }
+            meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Métodos de Pagamento' }
         },
         {
             path: '/countries',
             name: 'countries',
             component: () => import(/* webpackChunkName: "countries" */ '../views/countries/index.vue'),
-            meta: { requiresAuth: true, layout: 'app', title: 'Países' }
+            meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Países' }
         },
         {
             path: '/loan-interest-rates',
             name: 'loan-interest-rates',
             component: () => import(/* webpackChunkName: "loan-interest-rates" */ '../views/loan-interest-rates/index.vue'),
-            meta: { requiresAuth: true, layout: 'app', title: 'Taxas de Juros' }
+            meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Taxas de Juros' }
         },
         {
             path: '/loan-installment-options',
             redirect: '/loan-products',
-            meta: { requiresAuth: true, layout: 'app' }
+            meta: { requiresAuth: true, requiresAdmin: true, layout: 'app' }
         },
     {
         path: '/loan-products',
         name: 'loan-products',
         component: () => import(/* webpackChunkName: "loan-products" */ '../views/loan-products/index.vue'),
-        meta: { requiresAuth: true, layout: 'app', title: 'Produtos de Empréstimo' }
+        meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Produtos de Empréstimo' }
     },
     {
         path: '/loan-products/:id',
         name: 'loan-product-detail',
         component: () => import(/* webpackChunkName: "loan-product-detail" */ '../views/loan-products/detail.vue'),
-        meta: { requiresAuth: true, layout: 'app', title: 'Detalhe do Produto' }
+        meta: { requiresAuth: true, requiresAdmin: true, layout: 'app', title: 'Detalhe do Produto' }
     },
 
     // apps
@@ -747,27 +752,15 @@ router.beforeEach(async (to, from, next) => {
 
     // Proteção de rotas para Krefasy
     if (to.meta?.requiresAuth) {
-        try {
-            const raw = localStorage.getItem('USER_LOGIN');
-            const data = raw ? JSON.parse(raw) : null;
-            if (!data?.token) {
-                next('/auth/login');
-                return;
-            }
-        } catch {
+        if (!authService.isAuthenticated() || !authService.canAccessBackoffice()) {
             next('/auth/login');
             return;
         }
+    }
 
-        // Verificar se o usuário tem role de Admin
-        try {
-
-
-                next();
-        } catch (error) {
-            next('/auth/login');
-            return;
-        }
+    if (to.meta?.requiresAdmin && !authService.hasRole('Admin')) {
+        next('/dashboard');
+        return;
     }
 
     next(true);

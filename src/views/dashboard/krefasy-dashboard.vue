@@ -6,7 +6,7 @@
             :breadcrumbs="[{ label: 'Dashboard' }, { label: 'Krefasy' }]"
         >
             <template #actions>
-                <button class="btn-refresh" :disabled="loading || chartsLoading" @click="loadDashboardData">
+                <button class="btn-refresh" :disabled="loading" @click="loadDashboardData">
                     <span class="refresh-icon" :class="{ spinning: loading }">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
@@ -36,110 +36,15 @@
             </div>
         </div>
 
-        <!-- Gráficos -->
-        <div class="charts-grid">
-            <div class="dash-panel">
-                <div class="panel-header">
-                    <div>
-                        <h2 class="panel-title">Evolução de Empréstimos</h2>
-                        <p class="panel-subtitle">Quantidade de empréstimos criados — últimos 12 meses</p>
-                    </div>
-                </div>
-                <div class="chart-wrap">
-                    <div v-if="chartsLoading" class="chart-loader">
-                        <span class="spinner"></span>
-                        <p class="chart-loading-text">A carregar gráfico...</p>
-                    </div>
-                    <div v-else-if="!hasChartData" class="chart-empty">
-                        <p>Sem dados de empréstimos para o período</p>
-                    </div>
-                    <apexchart
-                        v-else
-                        height="325"
-                        :options="loansChart"
-                        :series="loansSeries"
-                        class="rounded-xl overflow-hidden"
-                    />
-                </div>
-            </div>
-
-            <div class="dash-panel">
-                <div class="panel-header">
-                    <div>
-                        <h2 class="panel-title">Distribuição por Produto</h2>
-                        <p class="panel-subtitle">Composição da carteira de crédito</p>
-                    </div>
-                </div>
-                <div class="chart-wrap">
-                    <div v-if="chartsLoading" class="chart-loader chart-loader-lg">
-                        <span class="spinner"></span>
-                        <p class="chart-loading-text">A carregar gráfico...</p>
-                    </div>
-                    <div v-else-if="!hasChartData" class="chart-empty chart-empty-lg">
-                        <p>Sem dados de produtos para exibir</p>
-                    </div>
-                    <apexchart
-                        v-else
-                        height="400"
-                        :options="productChart"
-                        :series="productSeries"
-                        class="rounded-xl overflow-hidden"
-                    />
-                </div>
-            </div>
-        </div>
-
         <!-- Tabelas -->
         <div class="tables-grid">
             <div class="dash-panel">
                 <div class="panel-header">
                     <div>
-                        <h2 class="panel-title">Empréstimos Pendentes</h2>
-                        <p class="panel-subtitle">Aguardando análise ou aprovação</p>
+                        <h2 class="panel-title">Cobranças em Atraso</h2>
+                        <p class="panel-subtitle">Parcelas vencidas com total incluindo juros de mora</p>
                     </div>
-                    <router-link to="/loans/pending" class="panel-link">Ver todos</router-link>
-                </div>
-
-                <div v-if="loading" class="table-skeleton">
-                    <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
-                </div>
-                <div v-else-if="pendingLoans.length === 0" class="empty-state">
-                    <icon-check-circle class="empty-icon success" />
-                    <p>Nenhum empréstimo pendente</p>
-                </div>
-                <div v-else class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Cliente</th>
-                                <th>Valor</th>
-                                <th>Status</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="loan in pendingLoans.slice(0, 5)" :key="loan.id">
-                                <td>
-                                    <span class="client-name">{{ loan.customerName || loan.clientName || '—' }}</span>
-                                </td>
-                                <td><span class="amount">R$ {{ formatAmount(loan.requestedAmount ?? loan.amount ?? 0) }}</span></td>
-                                <td><span class="badge badge-pending">Pendente</span></td>
-                                <td class="text-right">
-                                    <button class="btn-action" @click="viewLoan(loan.id)">Ver</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="dash-panel">
-                <div class="panel-header">
-                    <div>
-                        <h2 class="panel-title">Parcelas Vencendo</h2>
-                        <p class="panel-subtitle">Pagamentos em atraso ou próximos do vencimento</p>
-                    </div>
-                    <router-link to="/parcels/overdue" class="panel-link">Ver todas</router-link>
+                    <router-link to="/collections" class="panel-link">Ver todas</router-link>
                 </div>
 
                 <div v-if="loading" class="table-skeleton">
@@ -154,7 +59,7 @@
                         <thead>
                             <tr>
                                 <th>Cliente</th>
-                                <th>Valor</th>
+                                <th>Total com mora</th>
                                 <th>Vencimento</th>
                                 <th></th>
                             </tr>
@@ -164,7 +69,15 @@
                                 <td>
                                     <span class="client-name">{{ parcel.clientName }}</span>
                                 </td>
-                                <td><span class="amount">R$ {{ formatAmount(parcel.amount) }}</span></td>
+                                <td>
+                                    <span class="amount font-semibold">{{ formatParcelAmount(parcel) }}</span>
+                                    <p
+                                        v-if="parcel.lateInterest && parcel.lateInterest > 0"
+                                        class="text-xs text-red-500 dark:text-red-400 mt-0.5"
+                                    >
+                                        + {{ formatParcelAmount(parcel, parcel.lateInterest) }} mora ({{ parcel.daysOverdue }} dias)
+                                    </p>
+                                </td>
                                 <td><span class="due-date">{{ formatDate(parcel.dueDate) }}</span></td>
                                 <td class="text-right">
                                     <button class="btn-action btn-action-warning" @click="viewParcel(parcel.loanId)">Ver</button>
@@ -172,6 +85,21 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <div v-if="!loading && dueSoonParcels.length > 0" class="border-t border-gray-200/80 dark:border-gray-700/80 px-4 py-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">A vencer esta semana</p>
+                    <div class="space-y-2">
+                        <div
+                            v-for="parcel in dueSoonParcels"
+                            :key="`soon-${parcel.id}`"
+                            class="flex items-center justify-between gap-3 text-sm"
+                        >
+                            <span class="truncate">{{ parcel.clientName }}</span>
+                            <span class="text-gray-500 shrink-0">{{ formatDate(parcel.dueDate) }}</span>
+                            <button class="btn-action shrink-0" @click="viewParcel(parcel.loanId)">Ver</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -181,7 +109,7 @@
             <div class="panel-header">
                 <div>
                     <h2 class="panel-title">Atividade Recente</h2>
-                    <p class="panel-subtitle">Empréstimos pendentes e parcelas em atraso</p>
+                    <p class="panel-subtitle">Parcelas em atraso e a vencer</p>
                 </div>
             </div>
 
@@ -220,13 +148,22 @@ import { useKrefasyStore } from '@/stores/index';
 import { loansService } from '@/services/loans.service';
 import {
     fetchAllLoans,
-    buildMonthlyLoansEvolution,
-    buildProductDistribution,
     buildRecentActivity,
-    filterPendingLoans,
     fetchOverdueInstallments,
     type DashboardInstallment,
 } from '@/utils/dashboard-charts.utils';
+import {
+    fetchCollectibleInstallments,
+    filterCollectionInstallments,
+    formatCollectionAmount,
+    toDashboardInstallment,
+    type CollectionLoan,
+} from '@/utils/collections.utils';
+import { usePartnerScope } from '@/composables/use-partner-scope';
+import {
+    filterLoansForPartner,
+    getScopedCustomerIdsFromLoans,
+} from '@/utils/partner-scope.utils';
 import IconUsers from '@/components/icon/icon-users.vue';
 import IconTrendingUp from '@/components/icon/icon-trending-up.vue';
 import IconDollarSign from '@/components/icon/icon-dollar-sign.vue';
@@ -234,18 +171,13 @@ import IconInfoTriangle from '@/components/icon/icon-info-triangle.vue';
 import IconCheckCircle from '@/components/icon/icon-square-check.vue';
 import IconAlertCircle from '@/components/icon/icon-info-triangle.vue';
 
-const KREFASY_NAVY = '#0e1133';
-const KREFASY_PURPLE = '#801f82';
-const KREFASY_PURPLE_LIGHT = '#a832aa';
-
 const router = useRouter();
 const krefasyStore = useKrefasyStore();
+const { isRestrictedPartnerView, loggedUserId } = usePartnerScope();
 
 const loading = ref(false);
-const chartsLoading = ref(false);
-const hasChartData = ref(false);
-const pendingLoans = ref<any[]>([]);
 const overdueParcels = ref<DashboardInstallment[]>([]);
+const dueSoonParcels = ref<DashboardInstallment[]>([]);
 const recentActivity = ref<any[]>([]);
 
 const dashboardStats = computed(() => krefasyStore.dashboardStats);
@@ -277,111 +209,13 @@ const kpiCards = computed(() => [
     },
 ]);
 
-const loansChart = ref({
-    chart: {
-        type: 'area',
-        height: 325,
-        toolbar: { show: false },
-        fontFamily: 'inherit',
-    },
-    dataLabels: { enabled: false },
-    stroke: { curve: 'smooth', width: 2.5 },
-    fill: {
-        type: 'gradient',
-        gradient: {
-            shadeIntensity: 1,
-            opacityFrom: 0.35,
-            opacityTo: 0.02,
-            stops: [0, 90, 100],
-        },
-    },
-    colors: [KREFASY_PURPLE],
-    xaxis: {
-        categories: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-        labels: { style: { colors: '#94a3b8', fontSize: '12px' } },
-        axisBorder: { show: false },
-        axisTicks: { show: false },
-    },
-    yaxis: {
-        labels: { style: { colors: '#94a3b8', fontSize: '12px' } },
-    },
-    grid: {
-        borderColor: '#f1f5f9',
-        strokeDashArray: 4,
-    },
-    tooltip: { theme: 'dark' },
-});
-
-const loansSeries = ref([
-    { name: 'Empréstimos', data: [] as number[] },
-]);
-
-const productChart = ref({
-    chart: {
-        type: 'donut',
-        height: 400,
-        fontFamily: 'inherit',
-    },
-    colors: [KREFASY_PURPLE, KREFASY_NAVY, KREFASY_PURPLE_LIGHT, '#5c1760', '#6366f1'],
-    labels: [] as string[],
-    legend: {
-        position: 'bottom',
-        fontSize: '13px',
-        labels: { colors: '#64748b' },
-    },
-    plotOptions: {
-        pie: {
-            donut: {
-                size: '72%',
-                labels: {
-                    show: true,
-                    name: { fontSize: '14px', color: '#64748b' },
-                    value: { fontSize: '22px', fontWeight: 700, color: KREFASY_NAVY },
-                    total: {
-                        show: true,
-                        label: 'Total',
-                        fontSize: '13px',
-                        color: '#94a3b8',
-                    },
-                },
-            },
-        },
-    },
-    tooltip: { theme: 'dark' },
-});
-
-const productSeries = ref<number[]>([]);
-
-const updateCharts = (loans: Awaited<ReturnType<typeof fetchAllLoans>>) => {
-    const evolution = buildMonthlyLoansEvolution(loans);
-    const distribution = buildProductDistribution(loans);
-
-    loansSeries.value = [{ name: 'Empréstimos', data: evolution.data }];
-    loansChart.value = {
-        ...loansChart.value,
-        xaxis: {
-            ...loansChart.value.xaxis,
-            categories: evolution.categories,
-        },
-    };
-
-    productSeries.value = distribution.series;
-    productChart.value = {
-        ...productChart.value,
-        labels: distribution.labels,
-    };
-
-    hasChartData.value = loans.length > 0;
-};
-
-const viewLoan = (id: string) => router.push(`/loans/view/${id}`);
 const viewParcel = (loanId: string) => router.push(`/loans/view/${loanId}`);
 
 const formatDate = (date: string) => new Date(date).toLocaleDateString('pt-BR');
 
-const formatAmount = (amount: number) => {
-    if (amount >= 1000) return `${(amount / 1000).toFixed(1)}k`;
-    return amount.toLocaleString('pt-BR');
+const formatParcelAmount = (parcel: DashboardInstallment, value?: number) => {
+    const amount = value ?? parcel.totalDue ?? parcel.amount;
+    return formatCollectionAmount(amount, parcel.currencyCode, parcel.currencySymbol);
 };
 
 const formatTimeAgo = (timestamp: string) => {
@@ -394,13 +228,18 @@ const formatTimeAgo = (timestamp: string) => {
 const loadDashboardData = async () => {
     try {
         loading.value = true;
-        chartsLoading.value = true;
 
-        const allLoans = await fetchAllLoans(loansService);
+        let allLoans = await fetchAllLoans(loansService);
+
+        if (isRestrictedPartnerView.value) {
+            allLoans = filterLoansForPartner(allLoans, loggedUserId.value, 'all');
+        }
 
         await krefasyStore.fetchDashboardStats(allLoans);
 
-        pendingLoans.value = filterPendingLoans(allLoans, 5);
+        if (isRestrictedPartnerView.value) {
+            krefasyStore.dashboardStats.totalClients = getScopedCustomerIdsFromLoans(allLoans).size;
+        }
 
         let overdueResult = { items: [] as DashboardInstallment[], totalCount: 0 };
         try {
@@ -416,19 +255,29 @@ const loadDashboardData = async () => {
                 : krefasyStore.dashboardStats.overdueParcels
         );
 
-        updateCharts(allLoans);
+        try {
+            const collectible = await fetchCollectibleInstallments(
+                loansService,
+                allLoans as CollectionLoan[],
+                { maxLoans: 30 }
+            );
+
+            dueSoonParcels.value = filterCollectionInstallments(collectible, { dueFilter: 'due_soon' })
+                .slice(0, 3)
+                .map(toDashboardInstallment);
+        } catch (collectionsError) {
+            console.error('Erro ao buscar cobranças:', collectionsError);
+        }
 
         recentActivity.value = buildRecentActivity(
-            pendingLoans.value,
+            [],
             overdueParcels.value,
             { pending: IconCheckCircle, overdue: IconAlertCircle }
         );
     } catch (error) {
         console.error('Erro ao carregar dados do dashboard:', error);
-        hasChartData.value = false;
     } finally {
         loading.value = false;
-        chartsLoading.value = false;
     }
 };
 
@@ -575,16 +424,10 @@ onMounted(() => loadDashboardData());
 }
 
 /* ── Panels ── */
-.charts-grid,
 .tables-grid {
     display: grid;
     gap: 20px;
     margin-bottom: 24px;
-}
-
-@media (min-width: 1280px) {
-    .charts-grid,
-    .tables-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 .dash-panel {
@@ -650,43 +493,6 @@ onMounted(() => loadDashboardData());
 .panel-menu-btn :deep(svg) {
     width: 18px;
     height: 18px;
-}
-
-.chart-wrap {
-    margin: 0 -4px;
-}
-
-.chart-loader {
-    min-height: 325px;
-    display: grid;
-    place-content: center;
-    background: var(--krefasy-surface-muted);
-    border-radius: 12px;
-}
-
-.chart-loader-lg {
-    min-height: 400px;
-}
-
-.chart-loading-text {
-    margin-top: 12px;
-    font-size: 13px;
-    color: var(--krefasy-text-muted);
-}
-
-.chart-empty {
-    min-height: 325px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--krefasy-surface-muted);
-    border-radius: 12px;
-    color: var(--krefasy-text-muted);
-    font-size: 14px;
-}
-
-.chart-empty-lg {
-    min-height: 400px;
 }
 
 /* ── Tables ── */

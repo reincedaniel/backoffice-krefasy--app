@@ -32,12 +32,12 @@
                         <button
                             type="button"
                             class="btn btn-sm btn-outline-primary"
-                            :disabled="conversationsLoading"
+                            :disabled="conversationsLoading || conversationsRefreshing"
                             @click="refreshConversations"
                         >
                             <svg
                                 class="w-4 h-4"
-                                :class="{ 'animate-spin': conversationsLoading }"
+                                :class="{ 'animate-spin': conversationsLoading || conversationsRefreshing }"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -65,7 +65,7 @@
                     </div>
 
                     <div class="flex-1 overflow-y-auto space-y-2">
-                        <div v-if="conversationsLoading" class="flex items-center justify-center py-8">
+                        <div v-if="conversationsLoading && conversations.length === 0" class="flex items-center justify-center py-8">
                             <svg class="animate-spin h-6 w-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -163,7 +163,16 @@
                     </div>
 
                     <div class="flex-1 overflow-y-auto p-4 space-y-4 relative" ref="messagesContainer">
-                        <div v-if="messagesLoading" class="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-dark/50 z-10">
+                        <div
+                            v-if="messagesRefreshing"
+                            class="sticky top-0 z-10 text-center py-1 text-xs text-gray-500 bg-white/80 dark:bg-dark/80 rounded"
+                        >
+                            A actualizar...
+                        </div>
+                        <div
+                            v-if="messagesLoading && !hasCachedMessagesForActive"
+                            class="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-dark/50 z-10"
+                        >
                             <svg class="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -242,6 +251,7 @@
                         <div class="flex gap-2">
                             <div class="flex-1">
                                 <textarea
+                                    ref="messageTextarea"
                                     v-model="newMessage"
                                     class="form-input resize-none"
                                     placeholder="Digite sua mensagem..."
@@ -322,7 +332,7 @@
 <script setup lang="ts">
 import PageHeader from '@/components/layout/PageHeader.vue';
 import ConversationModal from '@/views/chat/ConversationModal.vue';
-import { ref, watch, onMounted, nextTick } from 'vue';
+import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import Swal from 'sweetalert2';
 import { useKrefasyStore } from '@/stores/krefasy.store';
@@ -332,13 +342,22 @@ const store = useKrefasyStore();
 const {
     conversations,
     conversationsLoading,
+    conversationsRefreshing,
     selectedConversation,
     currentMessages,
     messagesLoading,
+    messagesRefreshing,
     conversationStats,
 } = storeToRefs(store);
 
+const hasCachedMessagesForActive = computed(() =>
+    selectedConversation.value
+        ? store.hasCachedMessages(selectedConversation.value.id)
+        : false
+);
+
 const newMessage = ref('');
+const messageTextarea = ref<HTMLTextAreaElement>();
 const statusFilter = ref('');
 const priorityFilter = ref('');
 const showImageModal = ref(false);
@@ -359,11 +378,11 @@ const buildFilters = () => {
     return filters;
 };
 
-const loadConversations = async () => {
+const loadConversations = async (options?: { force?: boolean }) => {
     try {
-        await store.fetchConversations(buildFilters());
-        await store.fetchConversationStats();
-        await store.fetchUnreadChatNotifications();
+        const filters = buildFilters();
+        await store.fetchConversations(filters, options);
+        void store.fetchConversationStats();
     } catch (error) {
         console.error('Erro ao carregar conversas:', error);
         Swal.fire('Erro', 'Erro ao carregar conversas', 'error');
@@ -372,9 +391,9 @@ const loadConversations = async () => {
 
 const selectConversation = async (conversation: Conversation) => {
     try {
-        await store.fetchConversationById(conversation.id);
+        store.setActiveConversation(conversation);
         await store.fetchMessages(conversation.id);
-        await store.markConversationAsRead(conversation.id);
+        void store.markConversationAsRead(conversation.id);
         nextTick(() => scrollToBottom());
     } catch (error) {
         console.error('Erro ao carregar conversa:', error);
@@ -393,7 +412,6 @@ const handleSendMessage = async () => {
             messageType: 'TEXT',
         });
         newMessage.value = '';
-        await loadConversations();
         nextTick(() => scrollToBottom());
     } catch (error) {
         console.error('Erro ao enviar mensagem:', error);
@@ -428,7 +446,6 @@ const handleFileSelect = async (event: Event) => {
             attachments: [file],
         });
         newMessage.value = '';
-        await loadConversations();
         nextTick(() => scrollToBottom());
     } catch (error) {
         console.error('Erro ao enviar anexo:', error);
@@ -451,7 +468,7 @@ const scrollToBottom = () => {
 };
 
 const refreshConversations = () => {
-    loadConversations();
+    loadConversations({ force: true });
 };
 
 const resolveConversation = async () => {
@@ -461,7 +478,6 @@ const resolveConversation = async () => {
     try {
         await store.updateConversationStatus(selectedConversation.value.id, 'RESOLVED');
         Swal.fire('Sucesso', 'Conversa resolvida com sucesso', 'success');
-        await loadConversations();
     } catch (error) {
         console.error('Erro ao resolver conversa:', error);
         Swal.fire('Erro', 'Erro ao resolver conversa', 'error');
@@ -472,7 +488,9 @@ const resolveConversation = async () => {
 
 const onConversationCreated = async (conversation: Conversation) => {
     showConversationModal.value = false;
-    await loadConversations();
+    if (!conversations.value.some((c) => c.id === conversation.id)) {
+        conversations.value.unshift(conversation);
+    }
     await selectConversation(conversation);
 };
 
@@ -544,7 +562,7 @@ const formatFileSize = (bytes: number) => {
 };
 
 watch([statusFilter, priorityFilter], () => {
-    loadConversations();
+    loadConversations({ force: true });
 });
 
 const openPendingConversation = async () => {
@@ -556,17 +574,33 @@ const openPendingConversation = async () => {
         await selectConversation(conversation);
     } else {
         try {
-            const fetched = await store.fetchConversationById(pendingId);
-            await selectConversation(fetched);
+            const fetched = await store.fetchConversationById(pendingId, { force: true });
+            await store.fetchMessages(fetched.id);
+            void store.markConversationAsRead(fetched.id);
+            nextTick(() => scrollToBottom());
         } catch (error) {
             console.error('Erro ao abrir conversa pendente:', error);
         }
     }
+
+    if (store.pendingChatDraftMessage) {
+        newMessage.value = store.pendingChatDraftMessage;
+        store.clearPendingChatDraftMessage();
+        nextTick(() => {
+            messageTextarea.value?.focus();
+        });
+    }
+
     store.clearPendingChatConversationId();
 };
 
 onMounted(async () => {
+    store.setChatPageActive(true);
     await loadConversations();
     await openPendingConversation();
+});
+
+onUnmounted(() => {
+    store.setChatPageActive(false);
 });
 </script>

@@ -1,488 +1,574 @@
 <template>
-    <div>
+    <div class="space-y-5">
         <PageHeader
             title="Relatórios e Analytics"
-            subtitle="Acompanhe o desempenho financeiro e operacional"
+            subtitle="Desempenho financeiro real da carteira de crédito"
             :breadcrumbs="[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Relatórios' }]"
         >
             <template #actions>
-                <button type="button" class="btn btn-outline-primary" @click="exportReport">
-                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    Exportar
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm gap-2"
+                    :disabled="loading || loanRows.length === 0"
+                    @click="handleExport"
+                >
+                    <icon-download class="w-4 h-4" />
+                    Exportar CSV
                 </button>
-                <button type="button" class="btn btn-primary" @click="refreshData">
-                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
+                <button
+                    type="button"
+                    class="btn btn-primary btn-sm gap-2"
+                    :disabled="loading"
+                    @click="refresh"
+                >
+                    <icon-refresh class="w-4 h-4" :class="{ 'animate-spin': loading }" />
                     Atualizar
                 </button>
             </template>
         </PageHeader>
 
-        <div>
-            <!-- Filtros de Período -->
-            <div class="panel mb-6">
-                <div class="flex flex-wrap items-center gap-4">
-                    <div>
-                        <label class="form-label">Período</label>
-                        <select v-model="selectedPeriod" class="form-select">
-                            <option value="7">Últimos 7 dias</option>
-                            <option value="30">Últimos 30 dias</option>
-                            <option value="90">Últimos 90 dias</option>
-                            <option value="365">Último ano</option>
-                            <option value="custom">Personalizado</option>
-                        </select>
+        <!-- Filtros -->
+        <div class="panel">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Filtros</h2>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                    <label class="form-label">Período</label>
+                    <select v-model="selectedPeriod" class="form-select w-full">
+                        <option value="7">Últimos 7 dias</option>
+                        <option value="30">Últimos 30 dias</option>
+                        <option value="90">Últimos 90 dias</option>
+                        <option value="365">Último ano</option>
+                        <option value="custom">Personalizado</option>
+                    </select>
+                </div>
+                <div v-if="selectedPeriod === 'custom'">
+                    <label class="form-label">Data início</label>
+                    <input v-model="customStartDate" type="date" class="form-input w-full" />
+                </div>
+                <div v-if="selectedPeriod === 'custom'">
+                    <label class="form-label">Data fim</label>
+                    <input v-model="customEndDate" type="date" class="form-input w-full" />
+                </div>
+                <div>
+                    <label class="form-label">Granularidade</label>
+                    <select v-model="granularity" class="form-select w-full">
+                        <option value="day">Diário</option>
+                        <option value="week">Semanal</option>
+                        <option value="month">Mensal</option>
+                    </select>
+                </div>
+                <div v-if="!isRestrictedPartnerView">
+                    <label class="form-label">Gestor</label>
+                    <select v-model="selectedManagerId" class="form-select w-full">
+                        <option value="">Todos os gestores</option>
+                        <option v-for="m in managers" :key="m.id" :value="m.id">{{ m.name }}</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading / Error -->
+        <div v-if="loading" class="panel">
+            <div class="flex flex-col items-center justify-center py-16 gap-4">
+                <span class="animate-spin border-4 border-primary border-l-transparent rounded-full w-10 h-10"></span>
+                <span class="text-sm text-gray-600 dark:text-gray-300">
+                    {{ loadingProgress || 'A carregar relatórios...' }}
+                </span>
+            </div>
+        </div>
+
+        <div v-else-if="error" class="panel">
+            <div class="text-center py-16">
+                <p class="text-red-500 text-lg mb-4">Erro ao carregar relatórios</p>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">{{ error }}</p>
+                <button type="button" class="btn btn-primary" @click="refresh">Tentar novamente</button>
+            </div>
+        </div>
+
+        <template v-else>
+            <p v-if="hasMultipleCurrencies" class="text-sm text-amber-600 dark:text-amber-400 px-1">
+                Atenção: existem múltiplas moedas na carteira. Os totais abaixo referem-se à moeda principal ({{ primaryCurrency.currencyCode }}).
+            </p>
+
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                <div class="panel overflow-hidden relative">
+                    <div class="absolute inset-y-0 left-0 w-1 bg-primary"></div>
+                    <div class="pl-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Emprestado</p>
+                        <p class="text-xl font-bold text-primary mt-1">{{ fmt(primaryCurrency.disbursed) }}</p>
                     </div>
-                    <div v-if="selectedPeriod === 'custom'">
-                        <label class="form-label">Data Início</label>
-                        <input v-model="startDate" type="date" class="form-input" />
+                </div>
+                <div class="panel overflow-hidden relative">
+                    <div class="absolute inset-y-0 left-0 w-1 bg-success"></div>
+                    <div class="pl-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Recuperado</p>
+                        <p class="text-xl font-bold text-success mt-1">{{ fmt(primaryCurrency.recovered) }}</p>
                     </div>
-                    <div v-if="selectedPeriod === 'custom'">
-                        <label class="form-label">Data Fim</label>
-                        <input v-model="endDate" type="date" class="form-input" />
+                </div>
+                <div class="panel overflow-hidden relative">
+                    <div class="absolute inset-y-0 left-0 w-1 bg-warning"></div>
+                    <div class="pl-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Em aberto</p>
+                        <p class="text-xl font-bold text-warning mt-1">{{ fmt(primaryCurrency.outstanding) }}</p>
                     </div>
-                    <div>
-                        <label class="form-label">Tipo de Relatório</label>
-                        <select v-model="reportType" class="form-select">
-                            <option value="financial">Financeiro</option>
-                            <option value="operational">Operacional</option>
-                            <option value="risk">Risco</option>
-                            <option value="compliance">Compliance</option>
-                        </select>
+                </div>
+                <div class="panel overflow-hidden relative">
+                    <div class="absolute inset-y-0 left-0 w-1 bg-info"></div>
+                    <div class="pl-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Lucro contratado</p>
+                        <p class="text-xl font-bold text-info mt-1">{{ fmt(primaryCurrency.contractedProfit) }}</p>
+                    </div>
+                </div>
+                <div class="panel overflow-hidden relative">
+                    <div class="absolute inset-y-0 left-0 w-1 bg-secondary"></div>
+                    <div class="pl-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Lucro realizado</p>
+                        <p class="text-xl font-bold mt-1">{{ fmt(primaryCurrency.realizedProfit) }}</p>
+                    </div>
+                </div>
+                <div class="panel overflow-hidden relative">
+                    <div class="absolute inset-y-0 left-0 w-1" :class="summary.defaultRate > 5 ? 'bg-danger' : 'bg-success'"></div>
+                    <div class="pl-3">
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Recuperação / Ativos</p>
+                        <p class="text-xl font-bold mt-1">{{ primaryCurrency.recoveryRate.toFixed(1) }}%</p>
+                        <p class="text-xs text-gray-500">{{ summary.activeLoans }} ativos</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Cards de Resumo -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                <!-- Volume Total -->
-                <div class="panel">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Volume Total</h3>
-                            <p class="text-2xl font-bold text-primary">R$ 2.847.350</p>
-                            <p class="text-sm text-success">+12.5% vs período anterior</p>
-                        </div>
-                        <div class="p-3 bg-primary/10 rounded-full">
-                            <svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                            </svg>
-                        </div>
+            <!-- Alertas reais -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 flex items-center gap-3">
+                    <icon-clock class="w-8 h-8 text-amber-600 shrink-0" />
+                    <div>
+                        <p class="text-2xl font-bold text-amber-700 dark:text-amber-300">{{ alerts.pendingLoans }}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Empréstimos pendentes</p>
+                    </div>
+                </div>
+                <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4 flex items-center gap-3">
+                    <icon-info-triangle class="w-8 h-8 text-red-600 shrink-0" />
+                    <div>
+                        <p class="text-2xl font-bold text-red-700 dark:text-red-300">{{ alerts.overdueInstallments }}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Parcelas em atraso</p>
+                        <p v-if="alerts.overdueAmountDue > 0" class="text-xs text-red-600 dark:text-red-400 mt-1">
+                            Valor em atraso: {{ fmt(alerts.overdueAmountDue) }}
+                        </p>
+                    </div>
+                </div>
+                <div class="rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 p-4 flex items-center gap-3">
+                    <icon-dollar-sign class="w-8 h-8 text-rose-600 shrink-0" />
+                    <div>
+                        <p class="text-2xl font-bold text-rose-700 dark:text-rose-300">{{ fmt(alerts.accumulatedLateInterest) }}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Mora acumulada</p>
+                    </div>
+                </div>
+                <div class="rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 p-4 flex items-center gap-3">
+                    <icon-x-circle class="w-8 h-8 text-orange-600 shrink-0" />
+                    <div>
+                        <p class="text-2xl font-bold text-orange-700 dark:text-orange-300">{{ alerts.defaultedLoans }}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Empréstimos inadimplentes</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cobranças no período -->
+            <div class="panel !p-0 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100">Cobranças no período</h3>
+                        <p class="text-sm text-gray-500 mt-0.5">
+                            Parcelas a receber com vencimento no intervalo seleccionado
+                        </p>
+                    </div>
+                    <router-link
+                        :to="collectionsLink"
+                        class="btn btn-outline-primary btn-sm"
+                    >
+                        Ver todas em Cobranças
+                    </router-link>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-5 border-b border-gray-200 dark:border-gray-700">
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Total a cobrar</p>
+                        <p class="text-xl font-bold text-primary mt-1">{{ fmt(collectionReport.totalDueAmount) }}</p>
+                        <p class="text-xs text-gray-500">{{ collectionReport.totalCount }} parcela(s)</p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Em atraso</p>
+                        <p class="text-xl font-bold text-danger mt-1">{{ fmt(collectionReport.overdueAmount) }}</p>
+                        <p class="text-xs text-gray-500">{{ collectionReport.overdueCount }} parcela(s)</p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Em ordem</p>
+                        <p class="text-xl font-bold text-success mt-1">{{ fmt(collectionReport.onTimeAmount) }}</p>
+                        <p class="text-xs text-gray-500">{{ collectionReport.onTimeCount }} parcela(s)</p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-gray-500">Mora acumulada</p>
+                        <p class="text-xl font-bold text-warning mt-1">{{ fmt(collectionReport.lateInterestTotal) }}</p>
                     </div>
                 </div>
 
-                <!-- Empréstimos Ativos -->
-                <div class="panel">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Empréstimos Ativos</h3>
-                            <p class="text-2xl font-bold text-success">1.247</p>
-                            <p class="text-sm text-success">+8.2% vs período anterior</p>
-                        </div>
-                        <div class="p-3 bg-success/10 rounded-full">
-                            <svg class="w-8 h-8 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                    </div>
+                <div v-if="collectionReport.rows.length === 0" class="text-center py-12 text-gray-500">
+                    Sem parcelas a cobrar no período
                 </div>
-
-                <!-- Taxa de Inadimplência -->
-                <div class="panel">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Inadimplência</h3>
-                            <p class="text-2xl font-bold text-warning">3.2%</p>
-                            <p class="text-sm text-warning">+0.5% vs período anterior</p>
-                        </div>
-                        <div class="p-3 bg-warning/10 rounded-full">
-                            <svg class="w-8 h-8 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Ticket Médio -->
-                <div class="panel">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Ticket Médio</h3>
-                            <p class="text-2xl font-bold text-info">R$ 2.284</p>
-                            <p class="text-sm text-success">+5.3% vs período anterior</p>
-                        </div>
-                        <div class="p-3 bg-info/10 rounded-full">
-                            <svg class="w-8 h-8 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                            </svg>
-                        </div>
-                    </div>
+                <div v-else class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Gestor</th>
+                                <th>Vencimento</th>
+                                <th>Total</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in collectionReport.rows" :key="row.id">
+                                <td class="font-medium">{{ row.clientName }}</td>
+                                <td>{{ row.managerName }}</td>
+                                <td>{{ formatReportDate(row.dueDate) }}</td>
+                                <td class="font-semibold" :class="row.isOverdue ? 'text-danger' : ''">
+                                    {{ fmt(row.totalDue, row.currencyCode, row.currencySymbol) }}
+                                </td>
+                                <td>
+                                    <span class="badge" :class="row.isOverdue ? 'badge-outline-danger' : 'badge-outline-success'">
+                                        {{ row.isOverdue ? 'Em atraso' : 'Em ordem' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <router-link :to="`/loans/view/${row.loanId}`" class="btn btn-outline-primary btn-sm">
+                                        Ver
+                                    </router-link>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
             <!-- Gráficos -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <!-- Gráfico de Volume por Mês -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div class="panel">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold">Volume de Empréstimos por Mês</h3>
-                        <div class="flex gap-2">
-                            <button
-                                v-for="type in chartTypes"
-                                :key="type.value"
-                                @click="selectedChartType = type.value"
-                                class="btn btn-sm"
-                                :class="selectedChartType === type.value ? 'btn-primary' : 'btn-outline-primary'"
-                            >
-                                {{ type.label }}
-                            </button>
-                        </div>
+                    <div class="mb-4">
+                        <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100">Concessões vs Recuperações</h3>
+                        <p class="text-sm text-gray-500">Valores no período selecionado — granularidade {{ granularityLabel }}</p>
                     </div>
-                    <div class="h-80">
-                        <canvas ref="volumeChart" class="w-full h-full"></canvas>
+                    <div v-if="hasChartData" class="chart-wrap">
+                        <apexchart height="320" :options="evolutionChartOptions" :series="evolutionSeries" />
                     </div>
+                    <div v-else class="text-center py-16 text-gray-500">Sem dados para o período</div>
                 </div>
 
-                <!-- Gráfico de Status de Empréstimos -->
                 <div class="panel">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold">Distribuição por Status</h3>
+                    <div class="mb-4">
+                        <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100">Distribuição por Status</h3>
+                        <p class="text-sm text-gray-500">{{ summary.totalLoans }} empréstimos no período</p>
                     </div>
-                    <div class="h-80">
-                        <canvas ref="statusChart" class="w-full h-full"></canvas>
+                    <div v-if="statusDistribution.series.length > 0" class="chart-wrap">
+                        <apexchart height="320" :options="statusChartOptions" :series="statusSeries" />
                     </div>
+                    <div v-else class="text-center py-16 text-gray-500">Sem dados de status</div>
                 </div>
             </div>
 
-            <!-- Tabelas de Dados -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <!-- Top Clientes por Volume -->
-                <div class="panel">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold">Top Clientes por Volume</h3>
+            <!-- Tabela por gestor -->
+            <div v-if="!isRestrictedPartnerView" class="panel !p-0 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100">Desempenho por Gestor</h3>
+                </div>
+                <div v-if="managerRows.length === 0" class="text-center py-12 text-gray-500">Sem dados de gestores</div>
+                <div v-else class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead>
+                            <tr>
+                                <th>Gestor</th>
+                                <th>Empréstimos</th>
+                                <th>Emprestado</th>
+                                <th>Recuperado</th>
+                                <th>Em aberto</th>
+                                <th>Lucro contratado</th>
+                                <th>Lucro realizado</th>
+                                <th>Recuperação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in managerRows" :key="row.managerId">
+                                <td class="font-semibold">{{ row.managerName }}</td>
+                                <td>{{ row.loanCount }}</td>
+                                <td>{{ fmt(row.disbursed, row.currencyCode) }}</td>
+                                <td class="text-success">{{ fmt(row.recovered, row.currencyCode) }}</td>
+                                <td class="text-warning">{{ fmt(row.outstanding, row.currencyCode) }}</td>
+                                <td>{{ fmt(row.contractedProfit, row.currencyCode) }}</td>
+                                <td>{{ fmt(row.realizedProfit, row.currencyCode) }}</td>
+                                <td>{{ row.recoveryRate.toFixed(1) }}%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tabela por empréstimo -->
+            <div class="panel !p-0 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100">Detalhe por Empréstimo</h3>
+                    <span class="text-sm text-gray-500">{{ loanRows.length }} empréstimos</span>
+                </div>
+                <div v-if="loanRows.length === 0" class="text-center py-12 text-gray-500">Nenhum empréstimo no período</div>
+                <div v-else class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead>
+                            <tr>
+                                <th>Nº</th>
+                                <th>Cliente</th>
+                                <th>Gestor</th>
+                                <th>Emprestado</th>
+                                <th>Recuperado</th>
+                                <th>Em aberto</th>
+                                <th>Lucro contr.</th>
+                                <th>Lucro real.</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in loanRows" :key="row.loanId">
+                                <td class="font-semibold text-primary">{{ row.loanNumber }}</td>
+                                <td>
+                                    <p class="font-medium">{{ row.customerName }}</p>
+                                    <p class="text-xs text-gray-500">{{ row.productName }}</p>
+                                </td>
+                                <td class="text-sm">{{ row.managerName }}</td>
+                                <td>{{ fmt(row.disbursed, row.currencyCode, row.currencySymbol) }}</td>
+                                <td class="text-success">{{ fmt(row.recovered, row.currencyCode, row.currencySymbol) }}</td>
+                                <td class="text-warning">{{ fmt(row.outstanding, row.currencyCode, row.currencySymbol) }}</td>
+                                <td>{{ fmt(row.contractedProfit, row.currencyCode, row.currencySymbol) }}</td>
+                                <td>{{ fmt(row.realizedProfit, row.currencyCode, row.currencySymbol) }}</td>
+                                <td>
+                                    <span class="badge badge-outline-primary text-xs">{{ row.status }}</span>
+                                </td>
+                                <td>
+                                    <router-link :to="`/loans/view/${row.loanId}`" class="btn btn-outline-primary btn-sm">
+                                        Ver
+                                    </router-link>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Top clientes + produtos -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div class="panel !p-0 overflow-hidden">
+                    <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <h3 class="text-base font-semibold">Top Clientes por Volume</h3>
                         <span class="badge badge-primary">Top 10</span>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Cliente</th>
-                                    <th>Volume</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="client in topClients" :key="client.id">
-                                    <td>
-                                        <div class="flex items-center gap-2">
-                                            <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                                                <span class="text-xs font-semibold text-primary">{{ getInitials(client.name) }}</span>
-                                            </div>
-                                            <div>
-                                                <div class="font-semibold text-sm">{{ client.name }}</div>
-                                                <div class="text-xs text-gray-500">{{ client.email }}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="font-semibold">{{ formatCurrency(client.volume) }}</td>
-                                    <td>
-                                        <span class="badge" :class="getClientStatusClass(client.status)">
-                                            {{ client.status }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div v-if="topClients.length === 0" class="text-center py-12 text-gray-500">Sem clientes</div>
+                    <div v-else class="divide-y divide-gray-200 dark:divide-gray-700">
+                        <div
+                            v-for="client in topClients"
+                            :key="client.id"
+                            class="px-5 py-3 flex items-center justify-between gap-3"
+                        >
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                    <span class="text-xs font-bold text-primary">{{ getInitials(client.name) }}</span>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="font-semibold text-sm truncate">{{ client.name }}</p>
+                                    <p class="text-xs text-gray-500 truncate">{{ client.email || `${client.loanCount} empréstimo(s)` }}</p>
+                                </div>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="font-bold text-sm">{{ fmt(client.volume, client.currencyCode) }}</p>
+                                <span class="badge text-xs" :class="client.status === 'Em Atraso' ? 'badge-outline-warning' : 'badge-outline-success'">
+                                    {{ client.status }}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Produtos Mais Populares -->
-                <div class="panel">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold">Produtos Mais Populares</h3>
-                        <span class="badge badge-success">30 dias</span>
+                <div class="panel !p-0 overflow-hidden">
+                    <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-base font-semibold">Produtos Mais Utilizados</h3>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table-hover">
+                    <div v-if="productRows.length === 0" class="text-center py-12 text-gray-500">Sem produtos</div>
+                    <div v-else class="overflow-x-auto">
+                        <table class="table w-full">
                             <thead>
                                 <tr>
                                     <th>Produto</th>
-                                    <th>Quantidade</th>
+                                    <th>Qtd</th>
                                     <th>Volume</th>
+                                    <th>Recuperado</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="product in popularProducts" :key="product.id">
-                                    <td>
-                                        <div>
-                                            <div class="font-semibold text-sm">{{ product.name }}</div>
-                                            <div class="text-xs text-gray-500">{{ product.description }}</div>
-                                        </div>
-                                    </td>
-                                    <td class="font-semibold">{{ product.quantity }}</td>
-                                    <td class="font-semibold">{{ formatCurrency(product.volume) }}</td>
+                                <tr v-for="product in productRows" :key="product.id">
+                                    <td class="font-semibold">{{ product.name }}</td>
+                                    <td>{{ product.quantity }}</td>
+                                    <td>{{ fmt(product.volume, product.currencyCode) }}</td>
+                                    <td class="text-success">{{ fmt(product.recovered, product.currencyCode) }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
-
-            <!-- Relatório de Risco -->
-            <div class="panel mb-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold">Análise de Risco</h3>
-                    <div class="flex gap-2">
-                        <span class="badge badge-warning">Monitoramento Ativo</span>
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <!-- Score de Risco Médio -->
-                    <div class="text-center">
-                        <div class="relative w-24 h-24 mx-auto mb-4">
-                            <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 36 36">
-                                <path
-                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                    fill="none"
-                                    stroke="#e5e7eb"
-                                    stroke-width="3"
-                                />
-                                <path
-                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                    fill="none"
-                                    stroke="#f59e0b"
-                                    stroke-width="3"
-                                    stroke-dasharray="65, 100"
-                                />
-                            </svg>
-                            <div class="absolute inset-0 flex items-center justify-center">
-                                <span class="text-lg font-bold text-warning">65%</span>
-                            </div>
-                        </div>
-                        <h4 class="font-semibold text-warning">Score Médio</h4>
-                        <p class="text-sm text-gray-600">Baseado em 1.247 clientes</p>
-                    </div>
-
-                    <!-- Distribuição de Risco -->
-                    <div>
-                        <h4 class="font-semibold mb-3">Distribuição por Risco</h4>
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm">Baixo</span>
-                                <span class="text-sm font-semibold">45%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-success h-2 rounded-full" style="width: 45%"></div>
-                            </div>
-                        </div>
-                        <div class="space-y-2 mt-3">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm">Médio</span>
-                                <span class="text-sm font-semibold">35%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-warning h-2 rounded-full" style="width: 35%"></div>
-                            </div>
-                        </div>
-                        <div class="space-y-2 mt-3">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm">Alto</span>
-                                <span class="text-sm font-semibold">20%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-danger h-2 rounded-full" style="width: 20%"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Alertas -->
-                    <div>
-                        <h4 class="font-semibold mb-3">Alertas Ativos</h4>
-                        <div class="space-y-2">
-                            <div class="flex items-center gap-2 p-2 bg-warning/10 rounded">
-                                <svg class="w-4 h-4 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                                </svg>
-                                <span class="text-sm">12 clientes em atraso</span>
-                            </div>
-                            <div class="flex items-center gap-2 p-2 bg-danger/10 rounded">
-                                <svg class="w-4 h-4 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                                </svg>
-                                <span class="text-sm">3 clientes críticos</span>
-                            </div>
-                            <div class="flex items-center gap-2 p-2 bg-info/10 rounded">
-                                <svg class="w-4 h-4 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                <span class="text-sm">5 revisões pendentes</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Métricas de Performance -->
-            <div class="panel">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold">Métricas de Performance</h3>
-                    <span class="badge badge-success">Em Tempo Real</span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-success mb-2">98.2%</div>
-                        <div class="text-sm text-gray-600">Uptime do Sistema</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-primary mb-2">2.3s</div>
-                        <div class="text-sm text-gray-600">Tempo Médio de Resposta</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-info mb-2">1.247</div>
-                        <div class="text-sm text-gray-600">Clientes Ativos</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-warning mb-2">4.8/5</div>
-                        <div class="text-sm text-gray-600">Satisfação do Cliente</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </template>
     </div>
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted } from 'vue';
+import { useMeta } from '@/composables/use-meta';
+import { useReportsData } from '@/composables/use-reports-data';
+import { exportReportsToCsv, formatReportCurrency } from '@/utils/reports.utils';
 import PageHeader from '@/components/layout/PageHeader.vue';
-import { ref, onMounted, nextTick } from 'vue';
+import apexchart from 'vue3-apexcharts';
+import IconDownload from '@/components/icon/icon-download.vue';
+import IconRefresh from '@/components/icon/icon-refresh.vue';
+import IconClock from '@/components/icon/icon-clock.vue';
+import IconInfoTriangle from '@/components/icon/icon-info-triangle.vue';
+import IconXCircle from '@/components/icon/icon-x-circle.vue';
+import IconDollarSign from '@/components/icon/icon-dollar-sign.vue';
 
-// Refs
-const selectedPeriod = ref('30');
-const selectedChartType = ref('volume');
-const startDate = ref('');
-const endDate = ref('');
-const reportType = ref('financial');
-const volumeChart = ref<HTMLCanvasElement>();
-const statusChart = ref<HTMLCanvasElement>();
+useMeta({ title: 'Relatórios e Analytics' });
 
-const chartTypes = [
-    { label: 'Volume', value: 'volume' },
-    { label: 'Quantidade', value: 'quantity' },
-    { label: 'Taxa', value: 'rate' }
-];
+const KREFASY_PURPLE = '#801f82';
+const KREFASY_NAVY = '#0e1133';
 
-// Dados estáticos
-const topClients = [
-    {
-        id: '1',
-        name: 'Maria Silva',
-        email: 'maria.silva@email.com',
-        volume: 45000,
-        status: 'Ativo'
+const {
+    loading,
+    loadingProgress,
+    error,
+    selectedPeriod,
+    customStartDate,
+    customEndDate,
+    granularity,
+    selectedManagerId,
+    summary,
+    managerRows,
+    loanRows,
+    topClients,
+    productRows,
+    statusDistribution,
+    timeSeries,
+    alerts,
+    collectionReport,
+    managers,
+    hasMultipleCurrencies,
+    primaryCurrency,
+    periodRange,
+    isRestrictedPartnerView,
+    refresh,
+    loadReportsData,
+} = useReportsData();
+
+const granularityLabel = computed(() => {
+    if (granularity.value === 'day') return 'diária';
+    if (granularity.value === 'week') return 'semanal';
+    return 'mensal';
+});
+
+const hasChartData = computed(() =>
+    timeSeries.value.disbursements.some((v) => v > 0) ||
+    timeSeries.value.recoveries.some((v) => v > 0)
+);
+
+const evolutionSeries = computed(() => [
+    { name: 'Concessões', data: timeSeries.value.disbursements },
+    { name: 'Recuperações', data: timeSeries.value.recoveries },
+]);
+
+const evolutionChartOptions = computed(() => ({
+    chart: { type: 'bar', toolbar: { show: false }, fontFamily: 'inherit' },
+    plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
+    colors: [KREFASY_PURPLE, '#22c55e'],
+    dataLabels: { enabled: false },
+    xaxis: {
+        categories: timeSeries.value.categories,
+        labels: { rotate: -45, style: { fontSize: '11px', colors: '#94a3b8' } },
     },
-    {
-        id: '2',
-        name: 'Carlos Santos',
-        email: 'carlos.santos@email.com',
-        volume: 38000,
-        status: 'Ativo'
+    yaxis: {
+        labels: {
+            formatter: (v: number) => {
+                if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+                if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+                return String(Math.round(v));
+            },
+            style: { colors: '#94a3b8' },
+        },
     },
-    {
-        id: '3',
-        name: 'Ana Costa',
-        email: 'ana.costa@email.com',
-        volume: 32000,
-        status: 'Em Atraso'
+    legend: { position: 'top' },
+    grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+    tooltip: { theme: 'dark' },
+}));
+
+const statusSeries = computed(() => statusDistribution.value.series);
+
+const statusChartOptions = computed(() => ({
+    chart: { type: 'donut', fontFamily: 'inherit' },
+    colors: [KREFASY_PURPLE, KREFASY_NAVY, '#22c55e', '#f59e0b', '#ef4444', '#6366f1'],
+    labels: statusDistribution.value.labels,
+    legend: { position: 'bottom', fontSize: '12px' },
+    plotOptions: {
+        pie: {
+            donut: {
+                size: '65%',
+                labels: {
+                    show: true,
+                    total: { show: true, label: 'Total', fontSize: '13px' },
+                },
+            },
+        },
     },
-    {
-        id: '4',
-        name: 'Roberto Lima',
-        email: 'roberto.lima@email.com',
-        volume: 28000,
-        status: 'Ativo'
-    },
-    {
-        id: '5',
-        name: 'Fernanda Oliveira',
-        email: 'fernanda.oliveira@email.com',
-        volume: 25000,
-        status: 'Ativo'
+    tooltip: { theme: 'dark' },
+}));
+
+const fmt = (amount: number, code?: string, symbol?: string) =>
+    formatReportCurrency(amount, code || primaryCurrency.value.currencyCode, symbol || primaryCurrency.value.currencySymbol);
+
+const collectionsLink = computed(() => {
+    const query: Record<string, string> = {
+        dueDateFrom: periodRange.value.start.toISOString().slice(0, 10),
+        dueDateTo: periodRange.value.end.toISOString().slice(0, 10),
+    };
+    if (selectedManagerId.value) {
+        query.managerId = selectedManagerId.value;
     }
-];
+    return { path: '/collections', query };
+});
 
-const popularProducts = [
-    {
-        id: '1',
-        name: 'Empréstimo Pessoal',
-        description: 'Taxa fixa 2.5% a.m.',
-        quantity: 456,
-        volume: 1240000
-    },
-    {
-        id: '2',
-        name: 'Antecipação de FGTS',
-        description: 'Taxa fixa 1.8% a.m.',
-        quantity: 342,
-        volume: 890000
-    },
-    {
-        id: '3',
-        name: 'Crédito Consignado',
-        description: 'Taxa fixa 1.2% a.m.',
-        quantity: 289,
-        volume: 567000
-    },
-    {
-        id: '4',
-        name: 'Empréstimo Veículo',
-        description: 'Taxa fixa 2.8% a.m.',
-        quantity: 123,
-        volume: 89000
-    }
-];
-
-// Métodos
-const refreshData = () => {
-    console.log('Atualizando dados...');
-    // Simular atualização
-};
-
-const exportReport = () => {
-    console.log('Exportando relatório...');
-    // Simular exportação
+const formatReportDate = (date: string) => {
+    if (!date) return '—';
+    return new Date(date).toLocaleDateString('pt-BR');
 };
 
 const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
-const getClientStatusClass = (status: string) => {
-    switch (status) {
-        case 'Ativo': return 'badge-success';
-        case 'Em Atraso': return 'badge-warning';
-        case 'Inativo': return 'badge-secondary';
-        default: return 'badge-secondary';
-    }
+const handleExport = () => {
+    exportReportsToCsv(managerRows.value, loanRows.value);
 };
 
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-    }).format(value);
-};
-
-// Inicializar gráficos (simulação)
-const initCharts = () => {
-    nextTick(() => {
-        // Aqui você pode integrar com Chart.js, ApexCharts, etc.
-        console.log('Gráficos inicializados');
-    });
-};
-
-// Lifecycle
-onMounted(() => {
-    initCharts();
-});
+onMounted(() => loadReportsData());
 </script>
+
+<style scoped>
+.chart-wrap {
+    min-height: 320px;
+}
+</style>

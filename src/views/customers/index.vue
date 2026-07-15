@@ -1,221 +1,409 @@
 <template>
-    <div>
+    <div class="space-y-5">
         <PageHeader
             title="Gestão de Clientes"
-            subtitle="Gerencie todos os customers do sistema"
+            subtitle="Gerencie todos os clientes do sistema"
             :breadcrumbs="[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Clientes' }]"
         >
             <template #actions>
-                <button type="button" class="btn btn-outline-primary" @click="exportCustomers">
-                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
+                <button type="button" class="btn btn-outline-secondary btn-sm gap-2" @click="exportCustomers">
+                    <icon-download class="w-4 h-4" />
                     Exportar
                 </button>
-                <button type="button" class="btn btn-outline-primary" @click="showImportModal = true">
-                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-                    </svg>
+                <button type="button" class="btn btn-outline-primary btn-sm gap-2" @click="showImportModal = true">
+                    <icon-cloud-download class="w-4 h-4" />
                     Importar
                 </button>
-                <button type="button" class="btn btn-primary" @click="openModal">
-                    <svg class="w-5 h-5 ltr:mr-2 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                    </svg>
-                    Novo Clientes
+                <button type="button" class="btn btn-primary btn-sm gap-2" @click="openModal">
+                    <icon-plus-circle class="w-4 h-4" />
+                    Novo Cliente
                 </button>
             </template>
         </PageHeader>
 
-        <div>
-            <div class="mb-6">
-                <div class="flex flex-wrap gap-4">
-                    <div class="flex-1 min-w-64">
-                        <input
-                            v-model="searchQuery"
-                            type="text"
-                            placeholder="Buscar por nome, email ou telefone..."
-                            class="form-input"
-                            @input="debounceSearch"
-                        />
-                    </div>
+        <!-- Estatísticas -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="panel overflow-hidden relative">
+                <div class="absolute inset-y-0 left-0 w-1 bg-primary"></div>
+                <div class="flex items-center justify-between pl-3">
                     <div>
-                        <select v-model="countryFilter" class="form-select">
-                            <option value="">Todos os países</option>
-                            <option v-for="country in uniqueCountries" :key="country" :value="country">
-                                {{ country }}
-                            </option>
-                        </select>
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Total</p>
+                        <p class="text-3xl font-bold text-primary mt-1">{{ customers.length }}</p>
                     </div>
-                    <div>
-                        <select v-model="cityFilter" class="form-select">
-                            <option value="">Todas as cidades</option>
-                            <option v-for="city in uniqueCities" :key="city" :value="city">
-                                {{ city }}
-                            </option>
-                        </select>
+                    <div class="p-3 rounded-xl bg-primary/10">
+                        <icon-users class="w-6 h-6 text-primary" />
                     </div>
-                    <button
-                        type="button"
-                        class="btn btn-outline-primary"
-                        @click="clearFilters"
-                    >
-                        Limpar Filtros
-                    </button>
                 </div>
             </div>
 
-
-            <!-- Tabela -->
-            <div class="panel">
-                <div class="table-responsive">
-                    <table class="table-hover">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>Email</th>
-                                <th>Telefone</th>
-                                <th>Cidade</th>
-                                <th>País</th>
-                                <th>Documento</th>
-                                <th>Data de Cadastro</th>
-                                <th class="text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template v-if="loading">
-                                <tr>
-                                    <td colspan="8" class="text-center py-8">
-                                        <div class="flex items-center justify-center">
-                                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            Carregando...
-                                        </div>
-                                    </td>
-                                </tr>
-                            </template>
-                            <template v-else-if="filteredCustomers.length === 0">
-                                <tr>
-                                    <td colspan="8" class="text-center py-8 text-gray-500">
-                                        Nenhum customer encontrado
-                                    </td>
-                                </tr>
-                            </template>
-                            <template v-else>
-                                <tr v-for="customer in filteredCustomers" :key="customer.id">
-                                    <td class="font-semibold">{{ customer.fullName }}</td>
-                                    <td>{{ customer.email }}</td>
-                                    <td>{{ customer.phoneNumber }}</td>
-                                    <td>{{ customer.city || '-' }}</td>
-                                    <td>{{ customer.country || '-' }}</td>
-                                    <td>
-                                        <span v-if="customer.documentNumber" class="badge badge-outline-primary">
-                                            {{ customer.documentType }}: {{ customer.documentNumber }}
-                                        </span>
-                                        <span v-else class="text-gray-400">Não informado</span>
-                                    </td>
-                                    <td>{{ formatDate(customer.createdAt) }}</td>
-                                    <td class="text-center">
-                                        <div class="flex items-center justify-center gap-2">
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-outline-primary"
-                                                @click="viewCustomer(customer)"
-                                                title="Visualizar"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                                </svg>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-outline-primary"
-                                                @click="editCustomer(customer)"
-                                                title="Editar"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                                </svg>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-outline-danger"
-                                                @click="deleteCustomer(customer)"
-                                                title="Excluir"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
+            <div class="panel overflow-hidden relative">
+                <div class="absolute inset-y-0 left-0 w-1 bg-info"></div>
+                <div class="flex items-center justify-between pl-3">
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Resultados</p>
+                        <p class="text-3xl font-bold text-info mt-1">{{ filteredCustomers.length }}</p>
+                    </div>
+                    <div class="p-3 rounded-xl bg-info/10">
+                        <icon-search class="w-6 h-6 text-info" />
+                    </div>
                 </div>
             </div>
 
-            <!-- Modal de Customer -->
-            <CustomerModal
-                :show="showModal"
-                :customer="selectedCustomer"
-                :is-edit="isEdit"
-                @close="closeModal"
-                @save="handleSave"
-            />
-
-            <!-- Modal de Importação -->
-            <div v-if="showImportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div class="bg-white rounded-lg p-6 w-full max-w-md">
-                    <h3 class="text-lg font-semibold mb-4">Importar Clientes</h3>
-                    <div class="mb-4">
-                        <input
-                            ref="fileInput"
-                            type="file"
-                            accept=".csv,.xlsx"
-                            class="form-input"
-                            @change="handleFileSelect"
-                        />
+            <div class="panel overflow-hidden relative">
+                <div class="absolute inset-y-0 left-0 w-1 bg-success"></div>
+                <div class="flex items-center justify-between pl-3">
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Países</p>
+                        <p class="text-3xl font-bold text-success mt-1">{{ uniqueCountries.length }}</p>
                     </div>
-                    <div class="flex justify-end gap-2">
+                    <div class="p-3 rounded-xl bg-success/10">
+                        <icon-globe class="w-6 h-6 text-success" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel overflow-hidden relative">
+                <div class="absolute inset-y-0 left-0 w-1 bg-warning"></div>
+                <div class="flex items-center justify-between pl-3">
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Com documento</p>
+                        <p class="text-3xl font-bold text-warning mt-1">{{ withDocumentCount }}</p>
+                    </div>
+                    <div class="p-3 rounded-xl bg-warning/10">
+                        <icon-file class="w-6 h-6 text-warning" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="panel">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Filtros e pesquisa</h2>
+                <button
+                    v-if="hasActiveFilters"
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm gap-1"
+                    @click="clearFilters"
+                >
+                    <icon-x class="w-4 h-4" />
+                    Limpar
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div class="lg:col-span-1">
+                    <label class="form-label">Buscar</label>
+                    <input
+                        v-model="searchQuery"
+                        type="text"
+                        class="form-input w-full"
+                        placeholder="Nome, email, telefone ou documento..."
+                        @input="debounceSearch"
+                    />
+                </div>
+                <div>
+                    <label class="form-label">País</label>
+                    <select v-model="countryFilter" class="form-select w-full" @change="resetPage">
+                        <option value="">Todos os países</option>
+                        <option v-for="country in uniqueCountries" :key="country" :value="country">
+                            {{ country }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Cidade</label>
+                    <select v-model="cityFilter" class="form-select w-full" @change="resetPage">
+                        <option value="">Todas as cidades</option>
+                        <option v-for="city in uniqueCities" :key="city" :value="city">
+                            {{ city }}
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista -->
+        <div class="panel !p-0 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-800 dark:text-gray-100">Clientes</h2>
+                    <p v-if="filteredCustomers.length > 0" class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                        {{ paginationSummary }}
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Por página:</label>
+                    <select v-model.number="pageSize" @change="changePageSize" class="form-select form-select-sm w-auto">
+                        <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <div v-if="loading" class="flex items-center justify-center py-16">
+                <div class="flex flex-col items-center gap-4">
+                    <span class="animate-spin border-4 border-primary border-l-transparent rounded-full w-10 h-10"></span>
+                    <span class="text-sm text-gray-600 dark:text-gray-300">Carregando clientes...</span>
+                </div>
+            </div>
+
+            <div v-else-if="paginatedCustomers.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
+                <article
+                    v-for="customer in paginatedCustomers"
+                    :key="customer.id"
+                    class="p-5 hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition-colors border-l-4 border-l-primary/40"
+                >
+                    <div class="flex flex-col xl:flex-row xl:items-start gap-5">
+                        <div class="flex-1 min-w-0 space-y-4">
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                <div class="flex items-start gap-3 min-w-0">
+                                    <div class="shrink-0 w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center">
+                                        <span class="text-sm font-bold text-primary">{{ getInitials(customer.fullName) }}</span>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <h3 class="text-lg font-bold text-gray-900 dark:text-white truncate">
+                                            {{ customer.fullName }}
+                                        </h3>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1.5 mt-0.5 truncate">
+                                            <icon-mail class="w-3.5 h-3.5 shrink-0" />
+                                            {{ customer.email }}
+                                        </p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1.5 mt-0.5">
+                                            <icon-phone class="w-3.5 h-3.5 shrink-0" />
+                                            {{ customer.phoneNumber || '—' }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="text-left sm:text-right shrink-0">
+                                    <p class="text-xs text-gray-500">Cadastro</p>
+                                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ formatDate(customer.createdAt) }}</p>
+                                    <span
+                                        v-if="customer.documentNumber"
+                                        class="badge badge-outline-primary text-xs mt-2 inline-block"
+                                    >
+                                        {{ customer.documentType }} · {{ customer.documentNumber }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div class="rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                                    <p class="text-xs text-gray-500">Cidade</p>
+                                    <p class="text-sm font-semibold truncate">{{ customer.city || '—' }}</p>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                                    <p class="text-xs text-gray-500">Estado</p>
+                                    <p class="text-sm font-semibold truncate">{{ customer.state || '—' }}</p>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                                    <p class="text-xs text-gray-500">País</p>
+                                    <p class="text-sm font-semibold truncate">{{ customer.country || '—' }}</p>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                                    <p class="text-xs text-gray-500">Documentos</p>
+                                    <p class="text-sm font-semibold">{{ customer.documents?.length || 0 }}</p>
+                                </div>
+                            </div>
+
+                            <p v-if="customer.companyName" class="text-xs text-gray-500">
+                                Empresa: <span class="font-medium text-gray-700 dark:text-gray-300">{{ customer.companyName }}</span>
+                            </p>
+                        </div>
+
+                        <div class="flex flex-row xl:flex-col gap-2 xl:min-w-[130px] shrink-0">
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm gap-2 flex-1 xl:flex-none justify-center"
+                                @click="viewCustomer(customer)"
+                            >
+                                <icon-eye class="w-4 h-4" />
+                                Ver
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-outline-primary btn-sm gap-2 flex-1 xl:flex-none justify-center"
+                                @click="editCustomer(customer)"
+                            >
+                                <icon-edit class="w-4 h-4" />
+                                Editar
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-outline-danger btn-sm gap-2 flex-1 xl:flex-none justify-center"
+                                @click="deleteCustomer(customer)"
+                            >
+                                <icon-trash class="w-4 h-4" />
+                                Excluir
+                            </button>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <div v-else class="text-center py-16 px-5">
+                <icon-users class="w-14 h-14 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Nenhum cliente encontrado</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ hasActiveFilters ? 'Tente ajustar os filtros de busca.' : 'Não há clientes para exibir.' }}
+                </p>
+            </div>
+
+            <!-- Paginação -->
+            <div
+                v-if="filteredCustomers.length > 0"
+                class="px-5 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/20"
+            >
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 order-2 sm:order-1">
+                        Página <strong>{{ currentPage }}</strong> de <strong>{{ totalPages }}</strong>
+                        · {{ paginationSummary }}
+                    </p>
+
+                    <div class="flex items-center gap-1 order-1 sm:order-2">
                         <button
                             type="button"
-                            class="btn btn-outline-primary"
-                            @click="showImportModal = false"
+                            @click="changePage(1)"
+                            :disabled="currentPage === 1"
+                            class="btn btn-outline-secondary btn-sm px-2"
+                            title="Primeira página"
                         >
-                            Cancelar
+                            «
                         </button>
                         <button
                             type="button"
-                            class="btn btn-primary"
-                            @click="importCustomers"
-                            :disabled="!selectedFile"
+                            @click="changePage(currentPage - 1)"
+                            :disabled="currentPage === 1"
+                            class="btn btn-outline-secondary btn-sm gap-1"
                         >
-                            Importar
+                            <icon-arrow-left class="w-4 h-4" />
+                            Anterior
+                        </button>
+
+                        <button
+                            v-for="page in visiblePages"
+                            :key="page"
+                            type="button"
+                            @click="changePage(page)"
+                            :class="[
+                                'btn btn-sm min-w-[2.25rem]',
+                                page === currentPage ? 'btn-primary' : 'btn-outline-secondary'
+                            ]"
+                        >
+                            {{ page }}
+                        </button>
+
+                        <button
+                            type="button"
+                            @click="changePage(currentPage + 1)"
+                            :disabled="currentPage >= totalPages"
+                            class="btn btn-outline-secondary btn-sm gap-1"
+                        >
+                            Próximo
+                            <icon-arrow-forward class="w-4 h-4" />
+                        </button>
+                        <button
+                            type="button"
+                            @click="changePage(totalPages)"
+                            :disabled="currentPage >= totalPages"
+                            class="btn btn-outline-secondary btn-sm px-2"
+                            title="Última página"
+                        >
+                            »
                         </button>
                     </div>
                 </div>
             </div>
         </div>
+
+        <CustomerModal
+            :show="showModal"
+            :customer="selectedCustomer"
+            :is-edit="isEdit"
+            @close="closeModal"
+            @save="handleSave"
+        />
+
+        <!-- Modal de Importação -->
+        <Teleport to="body">
+            <div
+                v-if="showImportModal"
+                class="fixed inset-0 bg-black/60 flex items-center justify-center z-[99] p-4"
+                @click.self="showImportModal = false"
+            >
+                <div class="panel w-full max-w-md">
+                    <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Importar Clientes</h3>
+                        <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" @click="showImportModal = false">
+                            <icon-x class="w-5 h-5" />
+                        </button>
+                    </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Selecione um ficheiro CSV ou Excel para importar clientes em lote.
+                    </p>
+                    <input
+                        ref="fileInput"
+                        type="file"
+                        accept=".csv,.xlsx"
+                        class="form-input w-full"
+                        @change="handleFileSelect"
+                    />
+                    <div class="flex justify-end gap-2 mt-5">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @click="showImportModal = false">
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-primary btn-sm gap-2"
+                            @click="importCustomers"
+                            :disabled="!selectedFile"
+                        >
+                            <icon-cloud-download class="w-4 h-4" />
+                            Importar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useMeta } from '@/composables/use-meta';
 import { customerService, type Customer, type CustomerCreateUpdate } from '@/services/customers.service';
 import Swal from 'sweetalert2';
 import PageHeader from '@/components/layout/PageHeader.vue';
 import CustomerModal from './CustomerModal.vue';
+import IconUsers from '@/components/icon/icon-users.vue';
+import IconSearch from '@/components/icon/icon-search.vue';
+import IconGlobe from '@/components/icon/icon-globe.vue';
+import IconFile from '@/components/icon/icon-file.vue';
+import IconX from '@/components/icon/icon-x.vue';
+import IconDownload from '@/components/icon/icon-download.vue';
+import IconCloudDownload from '@/components/icon/icon-cloud-download.vue';
+import IconPlusCircle from '@/components/icon/icon-plus-circle.vue';
+import IconMail from '@/components/icon/icon-mail.vue';
+import IconPhone from '@/components/icon/icon-phone.vue';
+import IconEye from '@/components/icon/icon-eye.vue';
+import IconEdit from '@/components/icon/icon-edit.vue';
+import IconTrash from '@/components/icon/icon-trash.vue';
+import IconArrowLeft from '@/components/icon/icon-arrow-left.vue';
+import IconArrowForward from '@/components/icon/icon-arrow-forward.vue';
+import { usePartnerScope } from '@/composables/use-partner-scope';
+import { loansService } from '@/services/loans.service';
+import {
+    filterLoansForPartner,
+    getScopedCustomerIdsFromLoans,
+} from '@/utils/partner-scope.utils';
+
+useMeta({ title: 'Gestão de Clientes' });
 
 const router = useRouter();
+const { isRestrictedPartnerView, loggedUserId } = usePartnerScope();
 
-// Refs
 const customers = ref<Customer[]>([]);
+const scopedCustomerIds = ref<Set<string> | null>(null);
 const loading = ref(false);
 const showModal = ref(false);
 const showImportModal = ref(false);
@@ -227,21 +415,43 @@ const cityFilter = ref('');
 const selectedFile = ref<File | null>(null);
 const fileInput = ref<HTMLInputElement>();
 
-// Computed
+const currentPage = ref(1);
+const pageSize = ref(10);
+const pageSizeOptions = [5, 10, 20, 50];
+
 const uniqueCountries = computed(() => {
     const countries = customers.value.map(c => c.country).filter(Boolean);
-    return [...new Set(countries)];
+    return [...new Set(countries)].sort();
 });
 
 const uniqueCities = computed(() => {
-    const cities = customers.value.map(c => c.city).filter(Boolean);
-    return [...new Set(cities)];
+    let list = customers.value;
+    if (countryFilter.value) {
+        list = list.filter(c => c.country === countryFilter.value);
+    }
+    const cities = list.map(c => c.city).filter(Boolean);
+    return [...new Set(cities)].sort();
 });
+
+const withDocumentCount = computed(() =>
+    customers.value.filter(c => c.documentNumber).length
+);
+
+const hasActiveFilters = computed(() =>
+    Boolean(searchQuery.value || countryFilter.value || cityFilter.value)
+);
 
 const filteredCustomers = computed(() => {
     let filtered = customers.value;
 
-    // Filtro por busca
+    if (scopedCustomerIds.value) {
+        filtered = filtered.filter(
+            (customer) =>
+                scopedCustomerIds.value!.has(customer.id) ||
+                scopedCustomerIds.value!.has(customer.userId)
+        );
+    }
+
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
         filtered = filtered.filter(customer =>
@@ -252,12 +462,10 @@ const filteredCustomers = computed(() => {
         );
     }
 
-    // Filtro por país
     if (countryFilter.value) {
         filtered = filtered.filter(customer => customer.country === countryFilter.value);
     }
 
-    // Filtro por cidade
     if (cityFilter.value) {
         filtered = filtered.filter(customer => customer.city === cityFilter.value);
     }
@@ -265,20 +473,75 @@ const filteredCustomers = computed(() => {
     return filtered;
 });
 
-// Métodos
+const totalPages = computed(() =>
+    Math.max(1, Math.ceil(filteredCustomers.value.length / pageSize.value))
+);
+
+const paginatedCustomers = computed(() => {
+    const start = (currentPage.value - 1) * pageSize.value;
+    return filteredCustomers.value.slice(start, start + pageSize.value);
+});
+
+const paginationSummary = computed(() => {
+    const total = filteredCustomers.value.length;
+    if (total === 0) return '';
+    const start = (currentPage.value - 1) * pageSize.value + 1;
+    const end = Math.min(currentPage.value * pageSize.value, total);
+    return `Mostrando ${start}–${end} de ${total} clientes`;
+});
+
+const visiblePages = computed(() => {
+    const pages: number[] = [];
+    const maxVisible = 5;
+    let start = Math.max(1, currentPage.value - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages.value, start + maxVisible - 1);
+    start = Math.max(1, end - maxVisible + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+});
+
+const resetPage = () => {
+    currentPage.value = 1;
+};
+
+const changePage = (page: number) => {
+    if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page;
+    }
+};
+
+const changePageSize = () => {
+    currentPage.value = 1;
+};
+
+const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
 const loadCustomers = async () => {
     loading.value = true;
     try {
+        if (isRestrictedPartnerView.value && !scopedCustomerIds.value) {
+            const loans = filterLoansForPartner(
+                await loansService.getAllLoans(),
+                loggedUserId.value,
+                'all'
+            );
+            scopedCustomerIds.value = getScopedCustomerIdsFromLoans(loans);
+        }
+
         const response = await customerService.getCustomers();
         if (response.succeeded && response.data) {
             customers.value = response.data;
         } else {
-            console.error('Resposta da API:', response);
-            Swal.fire('Erro', 'Erro ao carregar customers', 'error');
+            Swal.fire('Erro', 'Erro ao carregar clientes', 'error');
         }
     } catch (error) {
-        console.error('Erro ao carregar customers:', error);
-        Swal.fire('Erro', 'Erro ao carregar customers', 'error');
+        console.error('Erro ao carregar clientes:', error);
+        Swal.fire('Erro', 'Erro ao carregar clientes', 'error');
     } finally {
         loading.value = false;
     }
@@ -316,41 +579,41 @@ const handleSave = async (data: CustomerCreateUpdate) => {
         }
 
         if (response.succeeded) {
-            Swal.fire('Sucesso', 'Customer salvo com sucesso!', 'success');
+            Swal.fire('Sucesso', 'Cliente salvo com sucesso!', 'success');
             closeModal();
             loadCustomers();
         } else {
-            Swal.fire('Erro', 'Erro ao salvar customer', 'error');
+            Swal.fire('Erro', 'Erro ao salvar cliente', 'error');
         }
     } catch (error) {
-        console.error('Erro ao salvar customer:', error);
-        Swal.fire('Erro', 'Erro ao salvar customer', 'error');
+        console.error('Erro ao salvar cliente:', error);
+        Swal.fire('Erro', 'Erro ao salvar cliente', 'error');
     }
 };
 
 const deleteCustomer = async (customer: Customer) => {
     const result = await Swal.fire({
         title: 'Confirmar exclusão',
-        text: `Tem certeza que deseja excluir o customer "${customer.fullName}"?`,
+        text: `Tem certeza que deseja excluir o cliente "${customer.fullName}"?`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sim, excluir',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#ef4444'
+        confirmButtonColor: '#ef4444',
     });
 
     if (result.isConfirmed) {
         try {
             const response = await customerService.deleteCustomer(customer.id);
             if (response.succeeded) {
-                Swal.fire('Sucesso', 'Customer excluído com sucesso!', 'success');
+                Swal.fire('Sucesso', 'Cliente excluído com sucesso!', 'success');
                 loadCustomers();
             } else {
-                Swal.fire('Erro', 'Erro ao excluir customer', 'error');
+                Swal.fire('Erro', 'Erro ao excluir cliente', 'error');
             }
         } catch (error) {
-            console.error('Erro ao excluir customer:', error);
-            Swal.fire('Erro', 'Erro ao excluir customer', 'error');
+            console.error('Erro ao excluir cliente:', error);
+            Swal.fire('Erro', 'Erro ao excluir cliente', 'error');
         }
     }
 };
@@ -361,14 +624,14 @@ const exportCustomers = async () => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `customers-${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `clientes-${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
     } catch (error) {
-        console.error('Erro ao exportar customers:', error);
-        Swal.fire('Erro', 'Erro ao exportar customers', 'error');
+        console.error('Erro ao exportar clientes:', error);
+        Swal.fire('Erro', 'Erro ao exportar clientes', 'error');
     }
 };
 
@@ -391,11 +654,11 @@ const importCustomers = async () => {
             }
             loadCustomers();
         } else {
-            Swal.fire('Erro', 'Erro ao importar customers', 'error');
+            Swal.fire('Erro', 'Erro ao importar clientes', 'error');
         }
     } catch (error) {
-        console.error('Erro ao importar customers:', error);
-        Swal.fire('Erro', 'Erro ao importar customers', 'error');
+        console.error('Erro ao importar clientes:', error);
+        Swal.fire('Erro', 'Erro ao importar clientes', 'error');
     }
 };
 
@@ -403,22 +666,21 @@ const clearFilters = () => {
     searchQuery.value = '';
     countryFilter.value = '';
     cityFilter.value = '';
+    currentPage.value = 1;
 };
 
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
 };
 
-// Debounce para busca
-let searchTimeout: number;
+let searchTimeout: ReturnType<typeof setTimeout>;
 const debounceSearch = () => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-        // A busca é reativa via computed
+        currentPage.value = 1;
     }, 300);
 };
 
-// Lifecycle
 onMounted(() => {
     loadCustomers();
 });

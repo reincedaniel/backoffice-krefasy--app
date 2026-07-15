@@ -1,4 +1,5 @@
 import apiService, { ApiResponse } from './api';
+import { canAccessBackoffice, mergeLoginRoles, normalizeLoginResponse } from '@/utils/auth.utils';
 
 // Interfaces para autenticação
 export interface LoginRequest {
@@ -76,30 +77,21 @@ export class AuthService {
             const response = await apiService.post<LoginResponse>('/auth/login', credentials);
 
             if (response.succeeded && response.data) {
-                // response.data é do tipo LoginResponse (que tem token e user)
-                const loginData = response.data;
+                const loginData = normalizeLoginResponse(response.data as unknown as Record<string, unknown>);
 
-
-
-                if (!loginData.token || !loginData) {
+                if (!loginData.token) {
                     throw new Error('Dados de login incompletos');
                 }
-               /*  if (!loginData.token || !!loginData) {
-                    throw new Error('Dados de login incompletos');
-                } */
-                // loginData.roles.push('Admin');
-                // Verificar se o usuário tem role de Admin
-                if (!loginData.roles.includes('Admin')) {
-                    throw new Error('Acesso negado. Apenas administradores podem acessar o backoffice.');
+
+                if (!canAccessBackoffice(loginData.roles)) {
+                    throw new Error('Acesso negado. Apenas administradores e partners podem acessar o backoffice.');
                 }
-
-
 
                 // Guardar sessão do user logado em USER_LOGIN
                 localStorage.setItem(USER_LOGIN_KEY, JSON.stringify(loginData));
                 this.currentUser = loginData.user;
 
-                return { token: loginData.token, user: loginData.user, roles: loginData.roles };
+                return loginData;
             } else {
                 throw new Error(response.message || 'Resposta inválida da API');
             }
@@ -134,6 +126,12 @@ export class AuthService {
     // Verificar se o usuário tem role específico
     hasRole(role: string): boolean {
         return this.getCurrentUser()?.roles.includes(role) ?? false;
+    }
+
+    canAccessBackoffice(): boolean {
+        const data = this.getLoginData();
+        const roles = mergeLoginRoles(data ?? {});
+        return canAccessBackoffice(roles);
     }
 
     // Verificar se o usuário tem permissão específica

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <title>Krefasy Backoffice — Guia Técnico</title>
+  <style>
+    @page { margin: 2cm; size: A4; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 11pt;
+      line-height: 1.55;
+      color: #1e293b;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1 {
+      color: #0e1133;
+      font-size: 22pt;
+      border-bottom: 3px solid #801f82;
+      padding-bottom: 8px;
+      margin-top: 0;
+    }
+    h2 {
+      color: #801f82;
+      font-size: 14pt;
+      margin-top: 28px;
+      page-break-after: avoid;
+    }
+    h3 {
+      color: #0e1133;
+      font-size: 12pt;
+      margin-top: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 20px;
+      font-size: 10pt;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f1f5f9; color: #0e1133; font-weight: 600; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 9.5pt;
+      font-family: Consolas, monospace;
+    }
+    pre {
+      background: #0e1133;
+      color: #e2e8f0;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 9pt;
+      overflow-x: auto;
+      line-height: 1.45;
+    }
+    pre code { background: none; color: inherit; padding: 0; }
+    .meta { color: #64748b; font-size: 10pt; margin-bottom: 24px; }
+    .note {
+      background: #fdf4ff;
+      border-left: 4px solid #801f82;
+      padding: 10px 14px;
+      margin: 16px 0;
+      font-size: 10pt;
+    }
+    ul { padding-left: 20px; }
+    li { margin: 4px 0; }
+    .diagram {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 16px;
+      font-family: Consolas, monospace;
+      font-size: 9pt;
+      white-space: pre;
+      line-height: 1.4;
+      border-radius: 8px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 9pt;
+      color: #94a3b8;
+      text-align: center;
+    }
+    .page-break { page-break-before: always; }
+  </style>
+</head>
+<body>
+
+<h1>Krefasy Backoffice — Guia Técnico para Desenvolvedores</h1>
+<p class="meta"><strong>Versão:</strong> 1.0 &nbsp;|&nbsp; <strong>Data:</strong> Julho 2026 &nbsp;|&nbsp; <strong>Público:</strong> Novos desenvolvedores</p>
+
+<h2>1. Visão geral</h2>
+<p>O <strong>Krefasy Backoffice</strong> é uma aplicação web administrativa para gestão de créditos e empréstimos. Permite que administradores gerem clientes, empréstimos, parcelas, configurações de produtos financeiros e atendimento por chat.</p>
+<table>
+  <tr><th>Item</th><th>Detalhe</th></tr>
+  <tr><td>Nome do projeto</td><td><code>backoffice-krefasy--app</code></td></tr>
+  <tr><td>Template base</td><td>Vristo Vue (customizado para Krefasy)</td></tr>
+  <tr><td>API backend</td><td><code>https://credit-api.krefasy.com/api/v1</code></td></tr>
+  <tr><td>Acesso</td><td>Apenas utilizadores com role <strong>Admin</strong></td></tr>
+</table>
+
+<h2>2. Stack tecnológica</h2>
+<table>
+  <tr><th>Tecnologia</th><th>Uso</th></tr>
+  <tr><td>Vue 3 + TypeScript</td><td>Framework UI (Composition API, &lt;script setup&gt;)</td></tr>
+  <tr><td>Vite 5</td><td>Bundler e dev server</td></tr>
+  <tr><td>Vue Router 4</td><td>Routing com lazy loading</td></tr>
+  <tr><td>Pinia</td><td>Gestão de estado</td></tr>
+  <tr><td>Tailwind CSS 3</td><td>Estilização utilitária</td></tr>
+  <tr><td>Axios</td><td>Cliente HTTP</td></tr>
+  <tr><td>ApexCharts</td><td>Gráficos no dashboard</td></tr>
+  <tr><td>SweetAlert2</td><td>Diálogos de confirmação/erro</td></tr>
+  <tr><td>vue-i18n</td><td>Internacionalização</td></tr>
+</table>
+
+<h2>3. Estrutura de pastas</h2>
+<pre><code>backoffice-krefasy--app/
+├── public/                 # Assets estáticos
+├── src/
+│   ├── assets/css/         # Estilos globais + krefasy-theme.css
+│   ├── components/layout/    # Header, Sidebar, Footer, PageHeader
+│   ├── composables/        # Lógica reutilizável
+│   ├── layouts/            # app-layout, auth-layout
+│   ├── router/index.ts     # Rotas
+│   ├── services/           # Camada API (um ficheiro por domínio)
+│   ├── stores/             # Pinia (app + krefasy)
+│   ├── utils/
+│   └── views/              # Páginas
+├── docs/                   # Documentação
+├── env.example
+├── Dockerfile
+└── package.json</code></pre>
+<div class="note"><strong>Nota:</strong> O projeto herda ~70 rotas de demonstração do template Vristo (<code>/apps/*</code>, <code>/elements/*</code>, etc.) que <strong>não fazem parte do produto Krefasy</strong>. O menu ativo está em <code>Sidebar.vue</code>.</div>
+
+<h2>4. Arquitetura em camadas</h2>
+<div class="diagram">Views (pages)        →  krefasy-chat.vue, customers/index.vue
+Components           →  PageHeader, Modals
+Stores (Pinia)       →  krefasy.store.ts
+Services             →  messages.service.ts, loans.service.ts
+API base (Axios)     →  api.ts (JWT automático)
+Backend .NET         →  credit-api.krefasy.com</div>
+<p><strong>Fluxo:</strong> View → Store/Service → api.ts → Backend → resposta <code>{ succeeded, data, message, errors }</code> → Store atualiza refs → View re-renderiza.</p>
+
+<h2>5. Services (camada API)</h2>
+<table>
+  <tr><th>Ficheiro</th><th>Domínio</th></tr>
+  <tr><td><code>api.ts</code></td><td>Cliente HTTP base, interceptors JWT</td></tr>
+  <tr><td><code>auth.service.ts</code></td><td>Login, logout, sessão</td></tr>
+  <tr><td><code>customers.service.ts</code></td><td>Clientes</td></tr>
+  <tr><td><code>loans.service.ts</code></td><td>Empréstimos</td></tr>
+  <tr><td><code>parcels.service.ts</code></td><td>Parcelas</td></tr>
+  <tr><td><code>messages.service.ts</code></td><td>Chat / conversas</td></tr>
+  <tr><td><code>users.service.ts</code></td><td>Utilizadores admin</td></tr>
+  <tr><td><code>currencies.service.ts</code></td><td>Moedas</td></tr>
+  <tr><td><code>countries.service.ts</code></td><td>Países</td></tr>
+  <tr><td><code>loan-products.service.ts</code></td><td>Produtos de empréstimo</td></tr>
+  <tr><td><code>loan-status.service.ts</code></td><td>Status de empréstimo</td></tr>
+  <tr><td><code>interest-periods.service.ts</code></td><td>Períodos de juros</td></tr>
+  <tr><td><code>payment-method-types.service.ts</code></td><td>Métodos de pagamento</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<h2>6. Autenticação</h2>
+<ul>
+  <li><strong>Login:</strong> <code>/auth/login</code> → <code>POST /auth/login</code></li>
+  <li><strong>Sessão:</strong> <code>localStorage</code> chave <code>USER_LOGIN</code> (token + user)</li>
+  <li><strong>Rotas protegidas:</strong> <code>meta.requiresAuth: true</code> no router</li>
+  <li><strong>Interceptor:</strong> adiciona <code>Authorization: Bearer</code>; 401 → redirect login</li>
+  <li><strong>Logout:</strong> <code>krefasyStore.logout()</code></li>
+</ul>
+
+<h2>7. Integração API (.NET)</h2>
+<p>O backend usa <strong>PascalCase</strong> em query params e multipart. O frontend usa camelCase; os services fazem o mapeamento.</p>
+<table>
+  <tr><th>Frontend</th><th>API (.NET)</th></tr>
+  <tr><td><code>page</code></td><td><code>Page</code></td></tr>
+  <tr><td><code>limit</code></td><td><code>Limit</code></td></tr>
+  <tr><td><code>unreadOnly</code></td><td><code>UnreadOnly</code></td></tr>
+  <tr><td><code>conversationId</code> (FormData)</td><td><code>ConversationId</code></td></tr>
+</table>
+<p>Envelope de resposta: <code>{ "succeeded": true, "data": {...}, "message": "...", "errors": null }</code></p>
+
+<h2>8. Páginas Krefasy (produto ativo)</h2>
+<h3>Menu principal</h3>
+<table>
+  <tr><th>Rota</th><th>Página</th><th>Descrição</th></tr>
+  <tr><td><code>/dashboard</code></td><td>krefasy-dashboard.vue</td><td>KPIs e gráficos</td></tr>
+  <tr><td><code>/customers</code></td><td>customers/index.vue</td><td>CRUD clientes</td></tr>
+  <tr><td><code>/customers/:id</code></td><td>customers/detail.vue</td><td>Detalhe cliente</td></tr>
+  <tr><td><code>/loans</code></td><td>krefasy-loans.vue</td><td>Listagem empréstimos</td></tr>
+  <tr><td><code>/loans/view/:id</code></td><td>krefasy-loan-detail.vue</td><td>Detalhe empréstimo</td></tr>
+  <tr><td><code>/loans/pending</code></td><td>krefasy-loans-pending.vue</td><td>Pendentes aprovação</td></tr>
+  <tr><td><code>/chat</code></td><td>krefasy-chat.vue</td><td>Chat com clientes (API real)</td></tr>
+  <tr><td><code>/users</code></td><td>users/index.vue</td><td>Utilizadores admin</td></tr>
+  <tr><td><code>/reports</code></td><td>krefasy-reports.vue</td><td>Relatórios</td></tr>
+</table>
+<h3>Configurações (submenu)</h3>
+<table>
+  <tr><th>Rota</th><th>Descrição</th></tr>
+  <tr><td><code>/loan-products</code></td><td>Produtos de empréstimo</td></tr>
+  <tr><td><code>/currencies</code></td><td>Moedas</td></tr>
+  <tr><td><code>/countries</code></td><td>Países</td></tr>
+  <tr><td><code>/interest-periods</code></td><td>Períodos de juros</td></tr>
+  <tr><td><code>/loan-status</code></td><td>Status de empréstimos</td></tr>
+  <tr><td><code>/payment-method-types</code></td><td>Métodos de pagamento</td></tr>
+  <tr><td><code>/loan-interest-rates</code></td><td>Taxas de juros</td></tr>
+</table>
+
+<h2>9. Módulo Chat</h2>
+<table>
+  <tr><th>Ficheiro</th><th>Função</th></tr>
+  <tr><td><code>krefasy-chat.vue</code></td><td>UI principal do chat</td></tr>
+  <tr><td><code>ConversationModal.vue</code></td><td>Criar conversa (admin)</td></tr>
+  <tr><td><code>messages.service.ts</code></td><td>API client com mapeamento PascalCase</td></tr>
+  <tr><td><code>use-chat-notifications.ts</code></td><td>Polling de não lidas (30s)</td></tr>
+</table>
+<p><strong>Notificações:</strong> badge na Sidebar + sino no Header com dropdown. Ao clicar, abre <code>/chat</code> na conversa certa.</p>
+
+<h2>10. Gestão de estado (Pinia)</h2>
+<table>
+  <tr><th>Store</th><th>Responsabilidade</th></tr>
+  <tr><td><code>useAppStore</code></td><td>Tema, sidebar, layout, i18n</td></tr>
+  <tr><td><code>useKrefasyStore</code></td><td>Dados de negócio: clientes, empréstimos, chat, dashboard</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<h2>11. Design system Krefasy</h2>
+<p>Definido em <code>src/assets/css/krefasy-theme.css</code>:</p>
+<table>
+  <tr><th>Token</th><th>Valor</th><th>Uso</th></tr>
+  <tr><td><code>--krefasy-navy</code></td><td>#0e1133</td><td>Header, fundos escuros</td></tr>
+  <tr><td><code>--krefasy-purple</code></td><td>#801f82</td><td>Cor primária</td></tr>
+  <tr><td><code>--krefasy-surface-muted</code></td><td>—</td><td>Fundo das páginas</td></tr>
+</table>
+<p>Componentes: <code>PageHeader</code> (título + actions), <code>Sidebar</code>, <code>Header</code>.</p>
+
+<h2>12. Variáveis de ambiente</h2>
+<table>
+  <tr><th>Variável</th><th>Descrição</th></tr>
+  <tr><td><code>VITE_API_BASE_URL</code></td><td>URL base da API</td></tr>
+  <tr><td><code>VITE_MAX_FILE_SIZE</code></td><td>Limite upload (10MB default)</td></tr>
+  <tr><td><code>VITE_WEBSOCKET_URL</code></td><td>WebSocket (fase 2)</td></tr>
+</table>
+<div class="note">Nunca colocar secrets em variáveis <code>VITE_*</code> — são expostas no bundle.</div>
+
+<h2>13. Setup local</h2>
+<pre><code>yarn install
+cp env.example .env
+yarn dev          # http://localhost:5173
+yarn build        # gera dist/
+yarn preview      # preview do build</code></pre>
+
+<h2>14. Deploy (Docker)</h2>
+<pre><code>yarn docker:build
+yarn docker:push:hub</code></pre>
+<p>O <code>Dockerfile</code> serve ficheiros estáticos de <code>dist/</code> via nginx.</p>
+
+<h2>15. Convenções</h2>
+<table>
+  <tr><th>Tipo</th><th>Convenção</th><th>Exemplo</th></tr>
+  <tr><td>Views Krefasy</td><td>krefasy-*.vue ou index.vue</td><td>krefasy-loans.vue</td></tr>
+  <tr><td>Services</td><td>*.service.ts</td><td>loans.service.ts</td></tr>
+  <tr><td>Modals</td><td>*Modal.vue</td><td>CustomerModal.vue</td></tr>
+  <tr><td>Composables</td><td>use-*.ts</td><td>use-chat-notifications.ts</td></tr>
+</table>
+<ul>
+  <li>Toda chamada HTTP passa por <code>src/services/</code></li>
+  <li>Erros nas views com SweetAlert2</li>
+  <li>Novas páginas usam <code>PageHeader</code></li>
+  <li>Não commitar <code>.env</code></li>
+</ul>
+
+<h2>16. Recursos</h2>
+<table>
+  <tr><th>Recurso</th><th>Localização</th></tr>
+  <tr><td>API Swagger</td><td>credit-api.krefasy.com</td></tr>
+  <tr><td>README</td><td>README-KREFASY.md</td></tr>
+  <tr><td>Env exemplo</td><td>env.example</td></tr>
+  <tr><td>Este guia (MD)</td><td>docs/ONBOARDING-DESENVOLVEDORES.md</td></tr>
+</table>
+
+<p class="footer">Krefasy Backoffice — Guia Técnico para Desenvolvedores — Julho 2026</p>
+
+</body>
+</html>

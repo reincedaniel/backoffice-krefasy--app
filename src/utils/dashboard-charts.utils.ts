@@ -1,4 +1,10 @@
 import type { LoansService } from '@/services/loans.service';
+import {
+    fetchCollectibleInstallments,
+    filterCollectionInstallments,
+    type CollectionLoan,
+    toDashboardInstallment,
+} from '@/utils/collections.utils';
 
 export interface DashboardLoan {
     id?: string;
@@ -6,6 +12,9 @@ export interface DashboardLoan {
     loanProductName?: string;
     customerName?: string;
     clientName?: string;
+    customerId?: string | null;
+    clientId?: string | null;
+    managerId?: string | null;
     requestedAmount?: number;
     amount?: number;
     loanStatusName?: string;
@@ -19,6 +28,11 @@ export interface DashboardInstallment {
     amount: number;
     dueDate: string;
     installmentNumber?: number;
+    currencyCode?: string;
+    currencySymbol?: string;
+    daysOverdue?: number;
+    lateInterest?: number;
+    totalDue?: number;
 }
 
 export interface OverdueInstallmentsResult {
@@ -127,11 +141,15 @@ export function buildRecentActivity(
     });
 
     overdueInstallments.forEach((installment) => {
+        const totalDue = installment.totalDue ?? installment.amount;
+        const moraHint = installment.lateInterest && installment.lateInterest > 0
+            ? ` (+ ${formatCurrency(installment.lateInterest)} mora, ${installment.daysOverdue ?? 0} dias)`
+            : '';
         activities.push({
             id: `installment-${installment.id}`,
             type: 'warning',
             title: 'Parcela vencida',
-            description: `${installment.clientName} — ${formatCurrency(installment.amount)} em atraso`,
+            description: `${installment.clientName} — ${formatCurrency(totalDue)} em atraso${moraHint}`,
             timestamp: installment.dueDate || new Date().toISOString(),
             icon: icons.overdue,
         });
@@ -180,16 +198,6 @@ function isPendingLoan(loan: DashboardLoan): boolean {
     return status === 'pendente' || status === 'pending';
 }
 
-function isCandidateForOverdueCheck(loan: DashboardLoan): boolean {
-    if (!loan.id) return false;
-    if (isPendingLoan(loan)) return false;
-
-    const status = (loan.loanStatusName || loan.status || '').toLowerCase();
-    if (status.includes('rejeit') || status.includes('reject')) return false;
-
-    return true;
-}
-
 export function filterPendingLoans(loans: DashboardLoan[], limit = 5): DashboardLoan[] {
     return loans
         .filter(isPendingLoan)
@@ -203,45 +211,18 @@ export async function fetchOverdueInstallments(
     maxLoans = 20,
     limit = 5
 ): Promise<OverdueInstallmentsResult> {
-    const candidates = loans
-        .filter(isCandidateForOverdueCheck)
-        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-        .slice(0, maxLoans);
-
-    const results = await Promise.allSettled(
-        candidates.map((loan) => loansService.getLoanById(loan.id!))
+    const allItems = await fetchCollectibleInstallments(
+        loansService,
+        loans as CollectionLoan[],
+        { maxLoans }
     );
 
-    const allOverdue: DashboardInstallment[] = [];
-
-    results.forEach((result, index) => {
-        if (result.status !== 'fulfilled') return;
-
-        const loan = result.value as unknown as Record<string, unknown>;
-        const candidate = candidates[index];
-        const loanId = candidate.id!;
-        const clientName = (loan.customerName as string) || candidate.customerName || candidate.clientName || 'Cliente';
-        const installments = (loan.installments as Array<Record<string, unknown>>) || [];
-
-        installments.forEach((inst) => {
-            if (!inst.isOverdue) return;
-
-            allOverdue.push({
-                id: String(inst.id),
-                loanId,
-                clientName,
-                amount: Number(inst.amount ?? 0),
-                dueDate: String(inst.dueDate),
-                installmentNumber: inst.installmentNumber != null ? Number(inst.installmentNumber) : undefined,
-            });
-        });
-    });
-
-    allOverdue.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    const overdueItems = filterCollectionInstallments(allItems, { dueFilter: 'overdue' })
+        .map(toDashboardInstallment);
 
     return {
-        items: allOverdue.slice(0, limit),
-        totalCount: allOverdue.length,
+        items: overdueItems.slice(0, limit),
+        totalCount: overdueItems.length,
     };
 }
 

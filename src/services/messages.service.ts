@@ -313,14 +313,12 @@ export class MessagesService {
 
     // Obter conversas por cliente
     async getConversationsByClient(clientId: string, params?: PaginationParams): Promise<ConversationListResponse> {
-        const response = await apiService.get<ConversationListResponse>(
-            `/clients/${clientId}/conversations`,
-            toConversationQueryParams(params)
-        );
-        if (!response.data) {
-            throw new Error('Dados não encontrados');
-        }
-        return normalizeApiObject<ConversationListResponse>(response.data);
+        return this.getConversations({
+            page: params?.page ?? 1,
+            limit: params?.limit ?? 10,
+            clientId,
+            ...params,
+        });
     }
 
     // Obter conversas por admin
